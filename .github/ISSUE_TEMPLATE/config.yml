@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Download the mod
+    url: https://github.com/Th3chef/Treasure-Radar/releases/latest
+    about: Get Treasure-Radar-0.5.0.zip from the latest release (not the source code).

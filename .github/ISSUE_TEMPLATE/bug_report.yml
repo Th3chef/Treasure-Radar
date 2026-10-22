@@ -1,0 +1,50 @@
+name: Bug report
+description: The radar, the ledger or the world markers don't work as described
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for the report! Please attach treasure_radar.log from %LOCALAPPDATA% (type %LOCALAPPDATA% into the File Explorer address bar and press Enter). It shows the options you picked, your HUD settings, what it found in the mission and any errors.
+  - type: input
+    id: version
+    attributes:
+      label: Mod version
+      placeholder: 0.5.0
+    validations:
+      required: true
+  - type: textarea
+    id: options
+    attributes:
+      label: Options
+      description: Which options you ticked (Loot Ledger, Opacity, Size, Rotate With View, World Markers, Range) and which kinds.
+      placeholder: "Core, Loot Ledger, Opacity 75%, Size Small, World Markers 50 m; all kinds."
+    validations:
+      required: true
+  - type: input
+    id: hud
+    attributes:
+      label: Screen resolution and HUD settings
+      placeholder: "3440x1440, HUD Scale 0.85, HUD Edge Offset 1"
+  - type: input
+    id: game
+    attributes:
+      label: Game version / date of the last game update
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you expected and what happened instead (a screenshot helps). Solo, hosting or joining someone else's game?
+    validations:
+      required: true
+  - type: textarea
+    id: mods
+    attributes:
+      label: Other mods
+      description: Other HUD mods, and anything else that replaces the game's boot script; your mod manager.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Drag treasure_radar.log here.
