@@ -9,7 +9,7 @@ body:
     id: version
     attributes:
       label: Mod version
-      placeholder: 0.5.0
+      placeholder: 0.5.1
     validations:
       required: true
   - type: textarea
