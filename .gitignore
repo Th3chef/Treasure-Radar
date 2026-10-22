@@ -1,0 +1,5 @@
+# build outputs
+src/out/
+__pycache__/
+*.pyc
+*.zip
