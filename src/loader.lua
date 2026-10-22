@@ -30,9 +30,16 @@ local loader_ok, loader_err = pcall(function()
 local LOADER = 'Chef Loader'             --@@LOADER@@
 local FILES = 'chef_loader'              --@@FILES@@
 local ALLOW = '^mods/chef/'              --@@ALLOW@@ my own mods first; other authors later
-local VERSION = '0.1.0'
+local VERSION = '0.1.1'
 local STABLE_FOR = 3                     -- seconds a main world must last before addons may draw in it
-local MISSION_UNITS = 5000               -- a main world bigger than this is a mission (ship ~3,800, missions 7,900-16,000)
+local MISSION_UNITS = 5000               -- a main world bigger than this is a mission (ship ~3,600-3,800, missions 4,900-16,000)
+local PROBE_MIN = 1000                   -- a smaller world (title, loading) is never probed for mission loot
+local MISSION_LOOT = 3                   -- mission loot units that make a world a mission
+local PROBE_DROP = 0.15                  -- a mission whose units fall this far below its peak is probed (the ship?)
+local SUDDEN_DROP = 0.05                 -- or this far between two looks 2 s apart
+local PROBE_EVERY = { 5, 10, 15 }        -- seconds between the first probes of a world that isn't a mission
+local PROBE_LATER = 60                   -- and after those
+local PROBE_IN_MISSION = 20              -- seconds between quiet probes of a mission no bigger than MISSION_UNITS
 local SCAN_PER_FRAME = 1500
 local RECENT = 60                        -- a per-frame job is only blamed for a crash within this many seconds of starting
 local MAX_ERRORS = 20                    -- Lua errors before an addon is switched off for the session
@@ -243,6 +250,7 @@ local function is_lua(s, i) for k = 1, 8 do if byte(s, i + k - 1) ~= LUA_TYPE[k]
 
 local found_addons, found_options, scan = {}, {}, { files = 0, ms = 0, bad = 0 }
 local MAX_ENTRIES, MAX_LUA = 200000, 4 * 1024 * 1024    -- sanity limits: a patch file claiming more is skipped
+local MAX_PATCH = 4095                   -- the last patch number I look at (big mod lists pass 512)
 -- One patch file: its table of contents, then the first bytes of each Lua resource. Anything that doesn't add up (a
 -- different format, a cut-off file) makes me skip that file, never read past it.
 local function read_patch(f, name)
@@ -275,7 +283,7 @@ end
 local function discover()
   local t0 = clock()
   local misses = 0
-  for n = 0, 512 do
+  for n = 0, MAX_PATCH do
     local name = 'data/9ba626afa44a3aa3.patch_' .. n
     local f = open(name, 'rb')
     if not f then
@@ -303,15 +311,70 @@ end
 -- world.id: a new one for every settled world, and when the same world's contents turn into another (the game loads
 -- the ship into the world the mission ran in). world.instance: a new one only for a new engine world; handles made in
 -- one instance (GUIs) can be kept across an id change, never across an instance change.
+-- Is it a mission? A world over MISSION_UNITS always is. A smaller one is a mission when the loot probe finds mission
+-- loot in it (kinds my addons named with chef.mission_kinds: samples, medals and the like, which the ship never has);
+-- small missions exist (one came in at 4,896 units with the ship at 3,558). Leaving: when a mission's unit count drops
+-- PROBE_DROP below its peak I stop calling it a mission at once (no drawing on what may be the ship) and probe: loot
+-- still there means it was only the mission thinning out, and it carries on as the same mission.
 local world = { main = nil, since = 0, time = -1, id = 0, instance = 0, stable = false, mission = false, units = 0 }
+local mission_kinds, kinds_from = {}, {}     -- kinds_from: the addons that named them (probing stops when they're off)
 local new_world_hooks = {}
 local function world_changed()
   for _, fn in ipairs(new_world_hooks) do fn() end
 end
+local function can_probe()
+  if skip['loader|scan'] then return false end
+  for _, a in ipairs(kinds_from) do if a.on then return true end end
+  return false
+end
+-- the probe's verdict (from probe_step below)
+local function probe_done(found, n)
+  world.probing, world.probe_at, world.probe_last = false, nil, n
+  world.probe_k, world.probe_done_t = (world.probe_k or 0) + 1, elapsed
+  if world.mission then
+    local was_checking = world.checking
+    world.checking = false
+    -- (a world over MISSION_UNITS stays a mission even with all its loot picked up)
+    if found >= MISSION_LOOT or n > MISSION_UNITS then
+      world.peak = n
+      if was_checking then log(fmt('world %d: still a mission (%d units, %d mission loot)', world.id, n, found)) end
+    else
+      -- the schedule starts over for what's there now (most likely the ship)
+      world.id, world.mission, world.units, world.probe_k, world.probe_said = world.id + 1, false, n, 1, false
+      log(fmt('world %d: not a mission (%d units; the mission is over)', world.id, n))
+      world_changed()
+    end
+  elseif found >= MISSION_LOOT then
+    world.id, world.mission, world.units, world.peak = world.id + 1, true, n, n
+    log(fmt('world %d: mission (%d units, %d mission loot)', world.id, n, found))
+    world_changed()
+  elseif not world.probe_said then
+    world.probe_said = true
+    log(fmt('world %d: no mission loot in %d units', world.id, n))
+  end
+end
+-- the ship arriving (or the world emptying on the way out) is a sudden drop between two looks; a mission thinning out
+-- is slow
+local function shrank(n, before)
+  return n < (world.peak or n) * (1 - PROBE_DROP) or n < (before or n) * (1 - SUDDEN_DROP)
+end
+-- maybe the mission is over: no drawing until the probe has looked (without the probe, only the size decides)
+local function left_maybe(n)
+  if can_probe() then
+    world.checking, world.probe_at = true, elapsed
+  elseif n <= MISSION_UNITS then
+    world.id, world.mission, world.units = world.id + 1, false, n
+    log(fmt('world %d: not a mission (%d units; the same world, its contents changed)', world.id, n))
+    world_changed()
+  end
+end
 local function update_world()
   local main = api('Application.main_world')
   if not main then
-    if world.main ~= nil then world.main, world.stable, world.mission = nil, false, false; world.instance = world.instance + 1; world_changed() end
+    if world.main ~= nil then
+      world.main, world.stable, world.mission, world.checking, world.probing = nil, false, false, false, false
+      world.instance = world.instance + 1; world_changed()
+    end
     return
   end
   local t = api('World.time', main)
@@ -321,6 +384,7 @@ local function update_world()
     -- be used again, and nothing new is made until it has settled
     local was_stable = world.stable or world.main ~= nil
     world.main, world.since, world.stable = main, elapsed, false
+    world.checking, world.probing = false, false
     world.instance = world.instance + 1
     if was_stable then world_changed() end
   end
@@ -332,26 +396,47 @@ local function update_world()
     local n = api('World.num_units', main)
     world.units = type(n) == 'number' and n or 0
     world.mission = world.units > MISSION_UNITS
+    world.peak, world.probe_k, world.probe_last, world.probe_said, world.probe_done_t = world.units, 0, nil, false, nil
+    world.last_n = world.units
+    world.probe_at = (not world.mission and can_probe() and world.units >= PROBE_MIN) and elapsed or nil
     world.recheck, world.flip = elapsed + 2, 0
-    log(fmt('world %d: %s (%d units)', world.id, world.mission and 'mission' or 'not a mission', world.units))
+    log(fmt('world %d: %s (%d units)', world.id, world.mission and 'mission' or
+      ((can_probe() and world.units >= PROBE_MIN) and 'not a mission yet' or 'not a mission'), world.units))
   elseif world.stable and elapsed >= (world.recheck or 0) then
     -- The game keeps the same main world after a mission (the ship is loaded into it), so I look at its size every
-    -- 2 s: on the other side of MISSION_UNITS it's a new world as far as addons are concerned (new id, mission or not;
-    -- the same instance). Leaving a mission counts at the first look (the mission's units are going away); a world
-    -- that turns into a mission needs two looks in a row.
+    -- 2 s; a change of verdict makes it a new world as far as addons are concerned (new id; the same instance).
     world.recheck = elapsed + 2
     local n = api('World.num_units', main)
-    if type(n) == 'number' then
-      if (n > MISSION_UNITS) ~= world.mission then
-        world.flip = (world.flip or 0) + 1
-        if world.flip >= 2 or world.mission then
-          world.flip, world.id, world.units, world.mission = 0, world.id + 1, n, n > MISSION_UNITS
-          log(fmt('world %d: %s (%d units; the same world, its contents changed)', world.id,
-            world.mission and 'mission' or 'not a mission', n))
-          world_changed()
-        end
-      else
-        world.flip = 0
+    if type(n) ~= 'number' or world.probing then return end
+    local before = world.last_n or n
+    world.last_n = n
+    if world.mission then
+      if n > (world.peak or 0) then world.peak = n end
+      if not world.checking and shrank(n, before) then
+        left_maybe(n)
+      elseif n <= MISSION_UNITS and can_probe() and not world.probe_at
+          and elapsed >= (world.probe_done_t or world.since) + PROBE_IN_MISSION then
+        -- a small mission is looked at again now and then: the ship can be loaded into it without its size dropping
+        -- far, and loot gone means the mission is over
+        world.probe_at = elapsed
+      end
+    elseif n > MISSION_UNITS then
+      -- a world that turns into a mission by its size needs two looks in a row
+      world.flip = (world.flip or 0) + 1
+      if world.flip >= 2 then
+        world.flip, world.id, world.units, world.mission, world.peak = 0, world.id + 1, n, true, n
+        log(fmt('world %d: mission (%d units; the same world, its contents changed)', world.id, n))
+        world_changed()
+      end
+    else
+      world.flip = 0
+      -- the probe again: on a schedule after the world settled, then every PROBE_LATER s, and at once when the world
+      -- grew by PROBE_DROP since the last probe
+      if can_probe() and n >= PROBE_MIN and not world.probe_at then
+        local k = world.probe_k or 0
+        local grew = world.probe_last and n > world.probe_last * (1 + PROBE_DROP)
+        local due = (world.probe_done_t or world.since) + (k == 0 and 0 or (PROBE_EVERY[k] or PROBE_LATER))
+        if grew or elapsed >= due then world.probe_at = elapsed end
       end
     end
   end
@@ -425,6 +510,15 @@ local function scan_start()
   if #due == 0 then return end
   local units = api('World.units', world.main)
   if type(units) ~= 'table' then return end
+  -- a mission world that just emptied (the way out) or turned into the ship isn't scanned: an empty list would show
+  -- as everything picked up until the next look at its size. (Against the last scan's list, not World.num_units: the
+  -- two needn't count the same units.)
+  local n, prev = #units, world.scan_n
+  world.scan_n = n
+  if world.mission and not world.checking and prev and n < prev * (1 - PROBE_DROP) then
+    left_maybe(n)
+    if world.checking or not world.mission then return end
+  end
   for _, w in ipairs(due) do w.want_now, w.next, w.building = false, elapsed + w.every, {} end
   job = { units = units, i = 0, due = due, world = world.id, instance = world.instance, t0 = clock(), cost = 0 }
   hold('loader|scan', true)   -- a game that dies mid-scan twice in a row stops the scan (my crash rule for jobs)
@@ -434,6 +528,7 @@ local pos_keys = {}               -- kind -> "Unit.world_position:<kind>", built
 -- with a new generation, so no addon keeps using units from the world that's gone.
 new_world_hooks[#new_world_hooks + 1] = function()
   if job then job = nil; hold('loader|scan', false) end
+  world.probing, world.scan_n = false, nil
   for _, w in ipairs(watchers) do
     w.items, w.building, w.generation, w.want_now = {}, nil, w.generation + 1, true
   end
@@ -468,6 +563,38 @@ local function scan_step()
     end
     job = nil
     hold('loader|scan', false)
+  end
+end
+
+-- The loot probe: the same walk over the world's units (the same engine calls, so the same crash key), counting
+-- mission loot only, and done as soon as there's enough of it. A few frames for a ship.
+local function probe_start()
+  local units = api('World.units', world.main)
+  if type(units) ~= 'table' then probe_done(0, world.units); return end
+  world.probing = true
+  job = { probe = true, units = units, i = 0, found = 0, world = world.id, instance = world.instance }
+  hold('loader|scan', true)
+end
+local function probe_step()
+  if not world.stable or job.world ~= world.id or job.instance ~= world.instance then
+    job = nil; hold('loader|scan', false); world.probing = false; return
+  end
+  local units = job.units
+  local last = min(#units, job.i + SCAN_PER_FRAME)
+  local found = job.found
+  for i = job.i + 1, last do
+    local n = api('Unit.debug_name', units[i])
+    local k = type(n) == 'string' and n:match('#ID%[(%x+)%]')
+    if k and mission_kinds[k] then
+      found = found + 1
+      if found >= MISSION_LOOT then last = #units; break end
+    end
+  end
+  job.i, job.found = last, found
+  if last >= #units then
+    job = nil
+    hold('loader|scan', false)
+    probe_done(found, #units)
   end
 end
 
@@ -849,7 +976,19 @@ local function make_api(a)
   function chef.time() return elapsed end
   function chef.world() if world.stable then return world.main end end
   function chef.world_id() return world.stable and world.id or 0 end
-  function chef.in_mission() return world.stable and world.mission end
+  function chef.in_mission() return world.stable and world.mission and not world.checking end
+  -- unit kinds (resource id hex -> true) that only exist in missions: the loader's loot probe looks for them to tell
+  -- a small mission from the ship
+  function chef.mission_kinds(kinds)
+    local any = false
+    for k in pairs(kinds) do
+      if type(k) == 'string' and k:match('^%x+$') then mission_kinds[k:lower()] = true; any = true end
+    end
+    if any then kinds_from[#kinds_from + 1] = a end
+    if world.stable and not world.mission and not world.probe_at and world.units >= PROBE_MIN and can_probe() then
+      world.probe_at = elapsed
+    end
+  end
   chef.camera = camera
   -- a world point on screen through my view camera: x, y in screen pixels (bottom-left origin, like the
   -- GUIs), or nil when it's behind me or there's no camera. The engine's answer is 2D, so "behind" is my own check.
@@ -1024,7 +1163,13 @@ local function frame(dt)
   frame_no = frame_no + 1
   tick()
   update_world()
-  if job then scan_step() elseif world.stable and #watchers > 0 then scan_start() end
+  if job then
+    if job.probe then probe_step() else scan_step() end
+  elseif world.stable and world.probe_at and elapsed >= world.probe_at then
+    if can_probe() then probe_start() else world.probe_at, world.checking = nil, false end
+  elseif world.stable and #watchers > 0 then
+    scan_start()
+  end
   for _, a in ipairs(addons) do run_hook(a, 'update', dt) end
   draw_notices()
   draw_flush()

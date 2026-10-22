@@ -1,5 +1,5 @@
 -- HD2-Addon: mods/chef/treasure_radar
--- Treasure Radar 0.5.0 (a Chef Loader addon; the successor of Treasure Map 1.x)
+-- Treasure Radar 0.5.1 (a Chef Loader addon; the successor of Treasure Map 1.x)
 -- What's still lying around in the mission: a round sonar radar where the game's map opens (bottom right) with an icon
 -- for every pickup around me, a ledger of pills counting what's left of each kind, and markers floating over the
 -- pickups near me in the world.
@@ -9,7 +9,7 @@
 -- Idle: nothing outside a mission; while the radar is hidden and the world markers are off, the unit list pauses too.
 
 local chef = ...
-local M = { version = '0.5.0' }
+local M = { version = '0.5.1' }
 local floor, sqrt, max, min, atan2, exp, pi = math.floor, math.sqrt, math.max, math.min, math.atan2, math.exp, math.pi
 
 -- Fallback icons, 9 x 9 (X = the kind's color, o = dark outline, . = empty), for when the textures can't be used.
@@ -180,6 +180,15 @@ for _, k in ipairs(KINDS) do
     active[#active + 1] = k
     for _, u in ipairs(k.units) do kind_of_unit[u] = k; watch_kinds[u] = true end
   end
+end
+-- Every loot kind, ticked or not, is how the loader tells a small mission from the ship (it never has any). Supplies
+-- aren't: I don't know that the ship has none.
+if chef.mission_kinds then
+  local loot = {}
+  for _, k in ipairs(KINDS) do
+    if not k.supply then for _, u in ipairs(k.units) do loot[u] = true end end
+  end
+  chef.mission_kinds(loot)
 end
 chef.log('kinds on: %d of %d | radar %s (%s%s) | ledger %s | range %d m | opacity %d%% | world markers %s', #active, #KINDS,
   tostring(SHOW_RADAR), opt.size or 'medium', ROTATE and ', turning with my view' or '', tostring(SHOW_LEDGER), range_now,

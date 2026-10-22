@@ -28,8 +28,8 @@ if '--header-from' in args:
     HEADER = open(args[args.index('--header-from') + 1], 'rb').read()[12:72]
 assert len(HEADER) == 60
 
-LOADER_VERSION = '0.1.0'
-TM_VERSION = '0.5.0'
+LOADER_VERSION = '0.1.1'
+TM_VERSION = '0.5.1'
 LOADER_GUID = '2d6f0b8e-91c4-4a37-b5e2-7c0a94f13d58'
 TM_GUID = 'dde1d14f-762f-4abf-85ed-42846077674c'           # Treasure Radar
 TM_TEST_GUID = '8e41c7a2-3f5d-4b90-a6e1-0d29b7f4c853'      # Treasure Radar Tester and test builds (installs beside it)
