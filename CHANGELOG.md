@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.1
+
+- Fixed: the radar never showed in smaller missions. Any world under 5,000 units counted as the ship, and some missions come in under that; now the mod also looks for the mission's loot (samples, medals, Super Credits, Requisition Slips) to tell a mission from the ship.
+- Fixed: on the way out of a mission the ledger could show everything as picked up for a moment.
+- Fixed: with a very long mod list (over 513 patch files), the mod could miss its own files.
+
 ## 0.5.0
 
 The first Treasure Radar: the successor of Treasure Map, rebuilt for the current game (the Lua 5.1 build) with its own

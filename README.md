@@ -6,7 +6,7 @@ https://github.com/user-attachments/assets/b9f28af4-796f-46c3-a233-ee650165ba50
 
 *Every sample, medal, Super Credit, Requisition Slip and supply around you, on a sonar radar where your map opens.*
 
-**Download:** `Treasure-Radar-0.5.0.zip` from the [latest release](https://github.com/Th3chef/Treasure-Radar/releases/latest) (not the source code). Nothing else needed: it has its own loader built in.
+**Download:** `Treasure-Radar-0.5.1.zip` from the [latest release](https://github.com/Th3chef/Treasure-Radar/releases/latest) (not the source code). Nothing else needed: it has its own loader built in.
 
 A round sonar radar sits where the game's map opens (bottom right) and shows the loot and supplies still lying around you, with a ledger of what's left in the mission and markers floating over the pickups near you. Sweep up the loot and restock before extraction instead of running back and forth looking for it. It's the successor of Treasure Map, rebuilt for the current game.
 
@@ -46,7 +46,7 @@ None. Treasure Radar has its own loader built in.
 
 ## Install / update
 
-1. Mod manager (Arsenal / HD2 Mod Manager): add `Treasure-Radar-0.5.0.zip` and enable it, tick Treasure Radar (core), the kinds you want and any options, then **Purge** and **Deploy**.
+1. Mod manager (Arsenal / HD2 Mod Manager): add `Treasure-Radar-0.5.1.zip` and enable it, tick Treasure Radar (core), the kinds you want and any options, then **Purge** and **Deploy**.
 2. Updating from Treasure Map: disable or remove Treasure Map first (it needs the old loaders, which no longer work on the current game).
 
 ## Uninstall
