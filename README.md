@@ -85,7 +85,6 @@ If you like my mods, you can support me on [Patreon](https://www.patreon.com/c/C
 
 ## Credits
 
-- Treasure Map (the 1.x versions) was inspired by **HD2 HUD+** by DDRK1NG, which marked loot on the tactical map. Treasure Radar is written from scratch and works on its own.
 - The pickup icons are copies of the game's own pickup icons.
 - Fonts: Poppins, Anton and Barlow Condensed (SIL Open Font License).
 
