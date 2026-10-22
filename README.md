@@ -2,6 +2,8 @@
 
 ![Treasure Radar](media/gallery.png)
 
+https://github.com/user-attachments/assets/b9f28af4-796f-46c3-a233-ee650165ba50
+
 *Every sample, medal, Super Credit, Requisition Slip and supply around you, on a sonar radar where your map opens.*
 
 **Download:** `Treasure-Radar-0.5.0.zip` from the [latest release](https://github.com/Th3chef/Treasure-Radar/releases/latest) (not the source code). Nothing else needed: it has its own loader built in.
