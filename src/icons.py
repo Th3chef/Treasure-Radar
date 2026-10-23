@@ -67,7 +67,7 @@ def draw_requisition(d):
 
 
 def draw_ammo(d):
-    # (1.2.0) an ammo box, as the game's pickup icon: three solid cartridges, the middle one raised
+    # an ammo box, as the game's pickup icon: three solid cartridges, the middle one raised
     for x, top in ((1, 6), (13.5, 0), (26, 6)):
         w = 9
         d.polygon([(x, top + 10), (x + 0.6, top + 5.5), (x + w / 2, top), (x + w - 0.6, top + 5.5), (x + w, top + 10)], fill=255)
@@ -75,7 +75,7 @@ def draw_ammo(d):
 
 
 def draw_grenade(d):
-    # (1.4.0) a frag grenade, drawn to read as one at a glance: a segmented ("pineapple") body, the fuse head on top,
+    # a frag grenade, drawn to read as one at a glance: a segmented ("pineapple") body, the fuse head on top,
     # the spoon lever down the right side and the pin's ring at the top left
     d.ellipse((1.5, 11, 26.5, 36), fill=255)
     for box in ((1, 19.6, 27, 22.1), (1, 27, 27, 29.5), (12.8, 11, 15.2, 36)):
@@ -93,7 +93,7 @@ def _rot(pts, ang, cx, cy):
 
 
 def draw_stim(d):
-    # (1.2.0) a stim pack, as the game's pickup icon: a syringe lying at a slant, needle up left, plunger down right
+    # a stim pack, as the game's pickup icon: a syringe lying at a slant, needle up left, plunger down right
     # (laid out along its own axis, then turned and centered in the 36-unit square)
     parts = [
         [(0, -0.9), (9, -0.9), (9, 0.9), (0, 0.9)],                              # needle
@@ -112,7 +112,7 @@ def draw_stim(d):
 
 
 def draw_fabricator(d):
-    # a bot fabricator (Treasure Map 1.4.0's): a factory with a sawtooth roof, a smokestack and a dark door
+    # a bot fabricator: a factory with a sawtooth roof, a smokestack and a dark door
     d.rectangle((0, 17, 36, 35), fill=255)
     for x in (0, 9, 18):
         d.polygon([(x, 17.5), (x + 9, 8), (x + 9, 17.5)], fill=255)
@@ -121,7 +121,7 @@ def draw_fabricator(d):
 
 
 def draw_bulkfab(d):
-    # a Bulk Fabricator (0.6.0): the fabricator's big brother: a wider hall with four roof teeth, two smokestacks and a
+    # a Bulk Fabricator, the fabricator's big brother: a wider hall with four roof teeth, two smokestacks and a
     # wide dark bay door, so it reads apart from a fabricator at a glance
     d.rectangle((0, 17, 36, 35), fill=255)
     for x in (0, 5.5, 11, 16.5):
@@ -132,7 +132,7 @@ def draw_bulkfab(d):
 
 
 def draw_ilship(d):
-    # an Illuminate warp ship (Treasure Map 1.4.0's): a flat saucer with a dome and a dark band of lights
+    # an Illuminate warp ship: a flat saucer with a dome and a dark band of lights
     d.ellipse((0, 15, 36, 29), fill=255)
     d.ellipse((9, 5, 27, 23), fill=255)
     d.rectangle((4, 21, 32, 22.5), fill=0)
@@ -141,14 +141,14 @@ def draw_ilship(d):
 
 
 def draw_bughole(d):
-    # a bug hole (Treasure Map 1.4.0's tunnel, the one I picked): a low rounded mound with a dark arched mouth
+    # a bug hole: a low rounded mound with a dark arched mouth
     d.ellipse((0, 8, 36, 52), fill=255)
     d.ellipse((11, 15, 25, 33), fill=0)
     d.rectangle((11, 24, 25, 36), fill=0)
 
 
 def draw_titanhole(d):
-    # (0.6.0 Test 32) a Bile Titan hole: the bug hole's tunnel, wider and lower, with three spikes on its back
+    # a Bile Titan hole (not drawn on the radar yet): the bug hole's tunnel, wider and lower, three spikes on its back
     d.ellipse((0, 12, 36, 52), fill=255)
     for pts in ([(4, 18), (6, 4), (11, 15)], [(15, 13), (18, 1), (21, 13)], [(25, 15), (30, 4), (32, 18)]):
         d.polygon(pts, fill=255)
@@ -157,7 +157,7 @@ def draw_titanhole(d):
 
 
 def draw_objective(d):
-    # (0.6.0 Test 32) a side objective (Treasure Map 1.1's): a diamond with an exclamation mark cut out
+    # a side objective (not drawn on the radar yet): a diamond with an exclamation mark cut out
     d.polygon([(18, 0), (36, 18), (18, 36), (0, 18)], fill=255)
     d.polygon([(15.4, 7), (20.6, 7), (19.7, 21.5), (16.3, 21.5)], fill=0)
     d.rectangle((15.6, 24.2, 20.4, 29), fill=0)

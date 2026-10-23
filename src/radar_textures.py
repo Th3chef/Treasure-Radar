@@ -20,7 +20,7 @@ def _letters(d, c, r, size, col):
 
 
 def sonar_disc(with_letters=True, master=False):
-    """the round panel (0.6.0 Test 22, redrawn): a dark green face, darker toward the edge; faint cross hairs; rings at a
+    """the round panel: a dark green face, darker toward the edge; faint cross hairs; rings at a
     quarter, half and three quarters of the range, each with a soft glow; a bright rim with a glow inside it; ticks every
     10 degrees (longer every 30, longest at N E S W); and N E S W (left off for Rotate With View: the addon places them).
     Drawn at 4x of DISC_TOP; master: that 4x picture, for shrinking straight to each size the radar draws it at."""
@@ -78,7 +78,7 @@ def sonar_disc(with_letters=True, master=False):
 
 def sweep_frame(i, n=SWEEP_FRAMES):
     """the sweep at turn i of n (clockwise from north): a bright leading line with a glow, and a green trail behind it
-    that fades smoothly (0.6.0 Test 22: finer steps and a softer falloff)"""
+    that fades smoothly"""
     from PIL import ImageFilter
     B = 4 * SWEEP
     img = Image.new('RGBA', (B, B), (0, 0, 0, 0)); d = ImageDraw.Draw(img); c = B / 2; r = c - 30
@@ -111,7 +111,7 @@ def pill(ring, master=False):
 
 
 def tile(master=False):
-    """(0.6.0 Test 23) a ledger tile, 15 x 17 cells (120 x 136): a rounded square, white (tinted dark)"""
+    """a ledger tile, 15 x 17 cells (120 x 136): a rounded square, white (tinted dark)"""
     W, H = 4 * 120, 4 * 136
     img = Image.new('RGBA', (W, H), (255, 255, 255, 0))
     ImageDraw.Draw(img).rounded_rectangle((2, 2, W - 3, H - 3), radius=40, fill=(255, 255, 255, 255))
@@ -138,7 +138,7 @@ def glow():
 
 
 GLYPHS = '0123456789MKX.NESW'
-GLYPH_SIZES = (7, 10, 14, 20, 28, 40)  # cap heights in px: the addon picks the one nearest the size it draws (7 and 10 since 0.6.0, for the small counts at 1080p)
+GLYPH_SIZES = (7, 10, 14, 20, 28, 40)  # cap heights in px: the addon picks the one nearest the size it draws (7 and 10 for the small counts at 1080p)
 GLYPH_PAD = 2
 
 
@@ -171,8 +171,8 @@ def glyph(ch, cap):
 
 
 # ------------------------------------------------------------------ the color swatches (test and Tester builds)
-# 0.6.0 Test 21: below native the radar came out duller than at native (screenshots: a fabricator (190,20,30) shows as
-# (255,0,0) at native but (147,16,9) at Ultra Quality). To match the two I measure both ways of drawing: a strip of
+# Below native the radar comes out duller than at native (a fabricator's (190,20,30) shows as (255,0,0) at native but
+# (147,16,9) at Ultra Quality). To match the two I measure both ways of drawing: a strip of
 # known colors drawn the radar's way, in both, screenshotted. 16 patches a row, 16 px each: grays, reds, greens and
 # blues opaque from 0 to 255, then white and the radar's green with alpha from 0 to 255.
 SWATCH = 16
@@ -191,7 +191,7 @@ def swatches():
 
 # ------------------------------------------------------------------ the size ladders
 # The game's UI material has no mipmaps: a texture drawn at half its size or less skips texels and its edges come out
-# as stair steps (Test 14 looked "kinda pixely"). So every picture the radar shrinks ships pre-shrunk at each step of
+# as stair steps. So every picture the radar shrinks ships pre-shrunk at each step of
 # 1/sqrt(2) from its biggest size, and the loader draws the one nearest the drawn size (chef.texture_sizes).
 LADDER = (1, 0.7071, 0.5, 0.3536, 0.25, 0.1768)
 
@@ -208,8 +208,8 @@ def ladder(w, h, steps=LADDER, least=8):
 
 
 def ui_copy(img):
-    """the UI world's copy of a texture drawn in its final colors (tinted white): since 0.6.0 Test 24 from the measured
-    curves of both ways of drawing (ui_calib.py), so below native it looks as it does at native"""
+    """the UI world's copy of a texture drawn in its final colors (tinted white), from the measured curves of both
+    ways of drawing (ui_calib.py), so below native it looks as it does at native"""
     import numpy as np, ui_calib
     arr = np.asarray(img.convert('RGBA')).astype(np.float64)
     out = ui_calib.ui_rgba(arr)

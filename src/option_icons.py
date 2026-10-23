@@ -166,7 +166,7 @@ def make_kind(kid):
     img = canvas(); icon(img, kid, 128, 128, 176); return img
 
 
-# ---- 0.6.0: weapons, Still Radar and the keys
+# ---- weapons, Still Radar and the keys
 def _weapon(uid):
     import weapon_textures as wt
     d = os.path.join(HERE, 'weapon_icons')

@@ -30,7 +30,7 @@ def read_archive(path):
 
 # header bytes 12..72 of a material/texture patch that loaded in build 25327279 (engine metadata only).
 # Cross-check and last resort only (patch-proofing: build from the live game's files). Audio patches need
-# their own header (hd2-patch-proofing, Wwise notes); a wrong header installs but does nothing in game.
+# their own header; a wrong header installs but does nothing in game.
 KNOWN_HEADER_25327279 = bytes.fromhex('00000000ce09f5f400000000a05345216b807fe000af620300000000008f660000000000000000000000000000000000000000000000000000000000')
 
 def write_archive(path, entries, header_from=None):
@@ -115,7 +115,7 @@ def lua_resource(src_bytes):
     return struct.pack('<II', len(src_bytes), 2) + src_bytes
 
 def write_lua_archive(path, entries, header12_72):
-    """entries: list of (fid, data). Layout matches the Rover/Bingus Lua addon archives."""
+    """entries: list of (fid, data), in the Lua addon patch layout."""
     head = struct.pack('<III', MAGIC, 1, len(entries)) + header12_72
     head += struct.pack('<QQQII', 0, LUA, len(entries), 16, 16)
     cursor = len(head) + 80 * len(entries); rows = body = b''

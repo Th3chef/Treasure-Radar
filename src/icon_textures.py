@@ -1,6 +1,6 @@
-"""Treasure Radar: the icon textures. The icon shapes are 1.x's (icons.py: vector copies of the game's pickup icons);
-each kind's icon is rendered at FILL px tall inside a SIZE x SIZE texture, in the kind's color with a dark outline
-(as 1.x's build.py did). Texture resource: 192-byte Stingray header + DDS header with DX10 extension (DXGI 28, RGBA8,
+"""Treasure Radar: the icon textures. The icon shapes are in icons.py (vector copies of the game's pickup icons);
+each kind's icon is rendered at FILL px tall inside a SIZE x SIZE texture, in the kind's color with a dark outline.
+Texture resource: 192-byte Stingray header + DDS header with DX10 extension (DXGI 28, RGBA8,
 one mip); pixels go to .gpu_resources."""
 import struct
 from PIL import Image, ImageFilter

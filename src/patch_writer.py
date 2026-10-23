@@ -1,4 +1,4 @@
-"""Treasure Map - writes a Helldivers 2 patch archive (the Lua and texture patches build.py makes).
+"""Treasure Radar: writes a Helldivers 2 patch archive (the Lua and texture patches build.py makes).
 
 Layout: a 72-byte header (magic, type count, entry count, then 60 bytes), 32-byte type rows (0, type, count, 16,
 alignment), 80-byte entries '<7Q6I' (id, type, data offset, stream offset, gpu offset, 0, 0, size, stream size, gpu size,

@@ -1,12 +1,12 @@
-"""Treasure Radar's below-native colors (0.6.0 Test 24): measured, not modeled.
+"""Treasure Radar's below-native colors: measured, not modeled.
 
-Test 23's swatches (16 steps of 17 per channel, drawn the radar's way) screenshotted at Native and at Ultra Quality on a
+Color swatches (16 steps of 17 per channel, drawn the radar's way) screenshotted at Native and at Ultra Quality on a
 3440x1440 HDR screen. At native my GUI is drawn in the game's world and goes through its tone mapping (N: a steep curve,
 colors hot and saturated: 136 already comes out 204-255); below native it's drawn in the UI world (U: close to a line,
 17 -> 35, 255 -> 255). Both blend before their curve (white at alpha a over black comes out exactly as gray a).
 So for each color of mine I store, below native, the value that comes out of U the way the original comes out of N:
 s = U^-1(N(c)) per channel; a see-through one also gets the alpha that best matches over two typical backgrounds.
-The same tables are in Chef Loader's loader.lua (ui_color), for the colors it's handed."""
+The same tables are in Chef Shared Loader (ui_color), for the colors it's handed."""
 import numpy as np
 
 STEP = 17

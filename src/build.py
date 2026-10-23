@@ -10,7 +10,7 @@
   --header-from <a working Lua patch> takes the patch header from a patch that works on the current game.
 
 Treasure Radar is a Chef Shared Loader addon packed as an Arsenal mod with Options. It needs Chef Shared Loader (1.0.0
-or newer, its own mod; its source kit is the loader's only home) and carries no loader of its own.
+or newer, installed as its own mod) and carries no loader of its own.
 The core folder holds the addon (treasure_radar.lua) and its textures, and every option folder ships a small
 "-- HD2-Options: mods/chef/treasure_radar" resource the loader merges. The zip is the same byte for byte on every build.
 Needs Python 3 and Pillow; the Poppins Bold font for the numbers (fonts/Poppins-Bold.ttf, SIL Open Font License).
@@ -51,10 +51,10 @@ TM_KINDS = [  # (option folder, Arsenal name, description, options table as Lua)
 TM_COLORS = {'credit': (115, 233, 242), 'super': (255, 114, 211), 'rare': (255, 151, 64), 'medal': (255, 221, 31),
              'common': (95, 220, 60), 'requisition': (244, 247, 56), 'ammo': (255, 234, 128), 'grenade': (135, 170, 45),
              'stim': (60, 140, 255), 'fabricator': (190, 20, 30), 'bulkfab': (190, 20, 30), 'ilship': (190, 20, 30), 'bughole': (190, 20, 30)}
-# 0.6.0: Weapons (a kind outside the ledger), Still Radar, and the keys. Key ids are the addon's KEYS names.
+# Weapons (a kind outside the ledger), Still Radar and the keys. Key ids are the addon's KEYS names.
 WEAPON_KIND = ('weapon', 'Weapons', "Support weapons and expendables lying on the ground (a fallen Helldiver's, one set down, an unused drop), each with its own silhouette, on the radar and as world markers. Not in the ledger; weapons someone is holding or carrying aren't shown.",
                "{ kinds = { weapon = true } }")
-# 0.6.0: Enemy Structures (one option for both kinds), in Treasure Map 1.4.0's deep red
+# Enemy Structures (one option for all of its kinds), in deep red
 STRUCT_KIND = ('structures', 'Enemy Structures', "Bot fabricators, Bulk Fabricators, Illuminate warp ships and bug holes, in deep red, on the radar (farther ones on its edge), in the ledger and as world markers. Fabricators, Bulk Fabricators and warp ships drop off once destroyed, bug holes once closed.",
                "{ kinds = { fabricator = true, bulkfab = true, ilship = true, bughole = true } }")
 KEY_LABELS = {'insert': 'Insert', 'home': 'Home', 'end': 'End', 'delete': 'Delete', 'pageup': 'Page Up', 'pagedown': 'Page Down',
@@ -116,7 +116,7 @@ def build_tm():
     addon, n = re.subn(r"^local M = \{ version = '[^']*' \}$", "local M = { version = '%s' }" % tag, addon, flags=re.M)
     assert n == 1
     textures, lines = [], []
-    # --weapons-from: the release's own weapon textures, by resource id (its core patch's .gpu_resources hold the pixels)
+    # --weapons-from: the release's own weapon textures, by resource id (its core patch's .gpu_resources hold them)
     from_release = {}
     from_release_zip = args[args.index('--weapons-from') + 1] if '--weapons-from' in args else None
     if from_release_zip:
@@ -165,7 +165,7 @@ def build_tm():
     T = rt.DISC_TOP
     sized('disc', rt.sonar_disc(True, master=True), T, T, steps=rt.LADDER[:5])
     sized('disc_plain', rt.sonar_disc(False, master=True), T, T, steps=rt.LADDER[:5])
-    # the ledger's tile (0.6.0 Test 23: the ledger is a grid of tiles), a rounded square at each size
+    # the ledger's tile, a rounded square at each size
     sized('tile', rt.tile(master=True), 120, 136, ui=False)
     sized('check', rt.check(master=True), 64, 64, ui=False)
     tex('glow', rt.glow())
@@ -174,7 +174,8 @@ def build_tm():
         fr = rt.sweep_frame(i)
         tex('sweep_%d' % i, fr, 'TEXTURES.sweep[%d]' % (i + 1))
         tex('sweep_%d_ui' % i, rt.ui_copy(fr), 'TEXTURES_UI[TEXTURES.sweep[%d]]' % (i + 1))
-    # the characters for numbers, at six sizes, each at its own width: GLYPHS[i] = { cap = px, ['0'] = { id, width / cap } }
+    # the characters for numbers, at six sizes, each at its own width:
+    # GLYPHS[i] = { cap = px, ['0'] = { id, width / cap } }
     lines.append('GLYPH_PAD = %d' % rt.GLYPH_PAD)
     for gi, cap in enumerate(rt.GLYPH_SIZES):
         lines.append('GLYPHS[%d] = { cap = %d }' % (gi + 1, cap))

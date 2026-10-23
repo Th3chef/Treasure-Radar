@@ -1,17 +1,16 @@
 -- HD2-Addon: mods/chef/treasure_radar
--- Treasure Radar 0.6.0 (a Chef Shared Loader addon; the successor of Treasure Map 1.x)
--- What's still lying around in the mission: a round sonar radar beside where the game's map opens (bottom right), with an icon
--- for every pickup around me, a ledger of tiles counting what's left of each kind, and markers floating over the
--- pickups near me in the world. Weapons on the ground (optional) show with their own silhouettes, outside the ledger.
+-- Treasure Radar, a Chef Shared Loader addon.
+-- A round sonar radar just left of where the game's map opens (bottom right), with an icon for every pickup around me,
+-- a ledger of tiles counting what's left of each kind, and markers floating over the pickups near me. Weapons on the
+-- ground (optional) show with their own silhouettes, outside the ledger.
 -- The settings are Arsenal options, and can be changed in game in the loader's options menu (F9).
--- How: the loader lists my pickup kinds' units every 3 s (spread over frames) and I draw everything with its screen
--- drawing. Nothing Lua can read says the map is open, so the radar sits just left of it, level with it, where the open
--- map never covers it and it never covers the map. Its spot follows the game's HUD Scale and HUD Edge Offset (read from the player's settings file).
--- Idle: nothing outside a mission; while the radar is hidden and the world markers are off, the unit list pauses too.
+-- How: the loader lists my kinds' units every 3 s (spread over frames) and I draw everything with its screen drawing.
+-- Nothing Lua can read says the map is open, so the radar sits beside it, level with it, where neither covers the
+-- other. Its spot follows the game's HUD Scale and HUD Edge Offset (read from the player's settings file).
+-- Idle: nothing runs outside a mission; while the radar is hidden and the world markers are off, the unit list pauses.
 
 local chef = ...
--- my lines go to treasure_radar.log next to the loader's log (Chef Shared Loader 1.0.0 and newer); an older loader
--- keeps them in chef_loader.log
+-- my log is treasure_radar.log next to the loader's; a loader without own_log keeps my lines in chef_loader.log
 if type(chef.own_log) == 'function' then chef.own_log('treasure_radar') end
 local M = { version = '0.6.0' }
 local floor, sqrt, max, min, atan2, exp, pi = math.floor, math.sqrt, math.max, math.min, math.atan2, math.exp, math.pi
@@ -37,8 +36,8 @@ local CHECK = { '........X', '.......XX', '......XX.', 'X....XX..', 'XX..XX...',
 
 -- The kinds, in ledger order (the most valuable first, supplies last), with their units' resource ids. Pickups of a
 -- kind within `stack` meters of each other share one icon on the radar, with a count.
--- Enemy structures are here only when I know how a destroyed one looks (it drops off then). Side objectives and Bile
--- Titan holes aren't: nothing I've seen change on them yet, so they would stay on the radar for the whole mission.
+-- An enemy structure is here only when I know how a destroyed one looks, so it drops off then. Side objectives and
+-- Bile Titan holes aren't: nothing readable changes on them, so they would stay on the radar all mission.
 local KINDS = {
   { id = 'credit', icon = 'coin', rgb = { 115, 233, 242 }, stack = 2, units = { 'bd6f4de16b9aedcd' } },
   { id = 'medal', icon = 'star', rgb = { 255, 221, 31 }, stack = 2, units = { '773c4184e4bad0df' } },
@@ -53,25 +52,21 @@ local KINDS = {
   { id = 'ammo', icon = 'ammo', rgb = { 255, 234, 128 }, stack = 10, supply = true, units = { '79ccffd281e3f3a9' } },
   { id = 'grenade', icon = 'grenade', rgb = { 135, 170, 45 }, stack = 10, supply = true, units = { '97af34fbf093409c' } },
   { id = 'stim', icon = 'cross', rgb = { 60, 140, 255 }, stack = 10, supply = true, units = { 'b4ca4c5b922f7965' } },
-  -- (0.6.0) Enemy Structures, in Treasure Map 1.4.0's deep red. A destroyed fabricator stays in the world: its animation
-  -- state goes to 3 (`dead_state`; the same reading Objective Tracker uses for bot outposts). A destroyed warp ship
-  -- stays in the world too: its meshes swap (`dead_mesh`, below).
+  -- Enemy Structures, in deep red. A destroyed bot fabricator stays in the world, but its animation state goes to 3
+  -- (`dead_state`).
   { id = 'fabricator', say = 'fabricator', icon = 'fab', rgb = { 190, 20, 30 }, stack = 5, structure = true, dead_state = 3, units = { 'a57ae2a703c02899' } },
-  -- (Test 20) The Bulk Fabricator (colony_cyborg_spawner; its entity is named "Bulk Fabricator" in the game's data). Its
-  -- state stays 0 when it's destroyed (Test 20 log), but its meshes swap: whole, meshes 1-3 and 17-20 show; destroyed,
-  -- 1-3 hide and the rubble (4-16) shows. So it's destroyed once its first mesh hides (`dead_mesh`).
+  -- The Bulk Fabricator (colony_cyborg_spawner). Its state stays 0 when destroyed, but its meshes swap: whole, meshes
+  -- 1-3 and 17-20 show; destroyed, 1-3 hide and the rubble (4-16) shows. So it's destroyed once mesh 1 hides.
   { id = 'bulkfab', say = 'Bulk Fabricator', icon = 'bfab', rgb = { 190, 20, 30 }, stack = 8, structure = true, dead_mesh = 1, units = { 'a2a86454f67fbc47' } },
-  -- (Test 29) A destroyed warp ship stays in the world too (my Test 28): it has no state machine, but its 16 meshes swap
-  -- like the Bulk Fabricator's. Whole, meshes 4-6 and 12-16 show (0001110000011111); destroyed, 1-3 and 7-11 show and
-  -- 4-6 hide (1110001111100000). So it's destroyed once mesh 4 hides.
+  -- A destroyed warp ship stays in the world too. It has no state machine, but its 16 meshes swap: whole, meshes 4-6
+  -- and 12-16 show (0001110000011111); destroyed, 1-3 and 7-11 show (1110001111100000). Destroyed once mesh 4 hides.
   { id = 'ilship', say = 'warp ship', icon = 'ship', rgb = { 190, 20, 30 }, stack = 5, structure = true, dead_mesh = 4, units = { 'f5f3207ca1b3a5d6' } },
-  -- (Test 30) Bug holes (small, medium, large and ceiling; the HD2 Codex's unit ids), the tunnel icon I picked for
-  -- Treasure Map 1.4.0. (Test 31) A closed hole swaps its meshes exactly like a destroyed warp ship (my Test 30 log:
-  -- no state machine, 16 meshes, open 0001110000011111, closed 1110001111100000), so it's closed once mesh 4 hides.
+  -- Bug holes (small, medium, large and ceiling). A closed hole swaps its meshes exactly like a destroyed warp ship
+  -- (no state machine, 16 meshes, open 0001110000011111, closed 1110001111100000), so it's closed once mesh 4 hides.
   { id = 'bughole', say = 'bug hole', icon = 'hole', rgb = { 190, 20, 30 }, stack = 5, structure = true, dead_mesh = 4,
     units = { '2e454bd4d24eb04a', 'a83587cbff25c79e', 'd6a27adb179ad4ff', '3b3327050e8c2c23' } },
-  -- support weapons and expendables lying on the ground (a fallen Helldiver's, one set down, an unused drop), each
-  -- drawn with its own silhouette (the game's marker icon); never in the ledger. Same weapons within `stack` share an icon.
+  -- Support weapons and expendables lying on the ground (a fallen Helldiver's, one set down, an unused drop), each
+  -- drawn with its own silhouette; never in the ledger. The same weapon within `stack` meters shares an icon.
   { id = 'weapon', icon = 'gun', rgb = { 235, 235, 235 }, stack = 1, weapon = true,
     units = { '6cfcc7f8801a0266', 'a8cffb316f0b5c5f', '89c5493e08ca4207', '96de9cd50f7306e6', '78a8185f63a70795',
               '80932fa0ed6901d3', '7617642765ac38c7', 'b2b5e0d185605f9e', '25aa2fd4643cf4ee', '39ab99895147a3bf',
@@ -80,20 +75,19 @@ local KINDS = {
               'b16c9d490aa59b77', '5990123d142b16cb', 'e8d5f49ad7780e54', '26e40437ea275296', '2e9d0bdc48b09e60',
               '3828e2051aa9e897', 'cc786f6491fe7e65', '43b2d7766120203b', '52071f49263415e4' } },
 }
--- A Helldiver (any player): a weapon held or on someone's back sits up at their hands or back, a dropped one on the
--- ground (also next to a body), so weapons near a Helldiver and CARRY_UP above their feet are carried, not shown.
+-- A Helldiver (any player). A weapon held or on someone's back sits up at their hands or back, a dropped one on the
+-- ground (also next to a body), so a weapon near a carrier and CARRY_UP above their feet is carried, not shown.
 local DIVER = '4d1c334d294dfa97'
 -- Everyone who can carry a support weapon: Helldivers (avatar_helldiver; fp_cha_avatar, the first-person one) and SEAF
--- troopers (cha_seaf, cha_battlefront_seaf: their specialists carry EATs and machine guns). (Test 10: weapons on
--- SEAF troopers' backs showed on the radar.)
+-- troopers (cha_seaf, cha_battlefront_seaf: their specialists carry EATs and machine guns).
 local CARRIERS = { [DIVER] = true, ['d0cf4d493ca08bed'] = true, ['7a3637cd33a54e4c'] = true, ['75f7e96af7dcd303'] = true }
 local CARRY_NEAR, CARRY_UP_MIN, CARRY_UP_MAX = 1.2, 0.5, 2.3
--- (Test 11: SEAF weapons still showed, logged 0.4-1.9 m from a trooper and -0.7 to 0.4 m up from his position, and
--- moving between lists) Near a carrier in this wider reach, a weapon only counts as lying on the ground once it has
--- stayed put from one list to the next: a trooper's weapon moves with him, one dropped by a body doesn't.
+-- A trooper's weapon can sit 0.4-1.9 m from him and -0.7 to 0.4 m up from his position. So near a carrier, in this
+-- wider reach, a weapon only counts as lying on the ground once it has stayed put from one list to the next: a
+-- trooper's weapon moves with him, one dropped by a body doesn't.
 local NEAR_REACH, NEAR_DOWN, NEAR_UP, STILL_M = 2.5, -1.5, 2.5, 0.3
--- My textures (resource ids, filled in by the build): the icons, the radar panel, the sweep's frames, the ledger's tile,
--- the check mark, the blip glow, and the characters for numbers at six sizes.
+-- My textures (resource ids, filled in by the build): the icons, the radar panel, the sweep's frames, the ledger's
+-- tile, the check mark, the blip glow, and the characters for numbers at six sizes.
 local TEXTURES = { weapons = {} }       -- weapons: unit id -> its silhouette (128 x 48); weapon_generic for the rest
 local GLYPHS, GLYPH_PAD = {}, 2
 local TEXTURES_UI = {}                  -- texture -> its copy for the UI world (below native Render Scale)
@@ -122,13 +116,13 @@ local OPACITY = max(0, min(1, tonumber(opt.opacity) or 1))       -- the panels' 
 -- Radar Animation (ticked by default in Arsenal): the sweep and the pickups lighting up; unticked, a still radar with
 -- every pickup at full strength
 local STILL = any_options and opt.animation ~= true
--- (Test 30) The settings as they are now: the Arsenal options above to start with, then whatever the player changes in
--- the loader's options menu (F9, when the loader has one; saved between launches). Everything below reads cfg, so a
--- change shows at once. One table rather than a local each also keeps the drawing functions under Lua 5.1's 60 upvalues.
+-- The settings as they are now: the Arsenal options above to start with, then whatever the player changes in the
+-- loader's options menu (F9; saved between launches). Everything below reads cfg, so a change shows at once. One
+-- table rather than a local each also keeps the drawing functions under Lua 5.1's 60 upvalues.
 local cfg = { radar = SHOW_RADAR, ledger = SHOW_LEDGER, scale = MAP_SCALE, rotate = ROTATE, markers = MARKERS,
               opacity = OPACITY, still = STILL, kinds = {} }
 for _, k in ipairs(KINDS) do cfg.kinds[k.id] = kind_on(k.id) end
-local ENDLESS = 10000                   -- World Markers at this range or more: no limit (Test 30: "endless draw distance")
+local ENDLESS = 10000                   -- World Markers at this range or more: no limit
 local function A(a) return floor(a * cfg.opacity + 0.5) end
 
 -- ------------------------------------------------------------------ keys (Arsenal: Hide Key, Zoom Keys, Markers Key)
@@ -159,8 +153,8 @@ end
 local HIDE_KEY = pick_key(opt.hide_key, 'f7')
 local MARKER_KEY = pick_key(opt.marker_key, 'f8')
 local ZOOM = (opt.zoom_keys == 'off') and 'off' or (ZOOM_PAIRS[opt.zoom_keys or ''] and opt.zoom_keys or 'numpad')
--- Double-Tap Tab To Hide (ticked by default). Until Test 21 it was Hold Tab To Hide: the option keeps its old folder
--- (tabhold) and key (tab_hold), so a player's tick carries over.
+-- Double-Tap Tab To Hide (ticked by default). The option keeps the old Hold Tab To Hide folder (tabhold) and key
+-- (tab_hold), so a player's tick carries over.
 local TAB_DOUBLE = not any_options or opt.tab_hold == true
 local HIDE_NAMES = HIDE_KEY ~= 'off' and KEYS[HIDE_KEY] or nil
 local MARKER_NAMES = MARKER_KEY ~= 'off' and KEYS[MARKER_KEY] or nil
@@ -176,17 +170,16 @@ local EYE = 1.6                         -- my camera sits about this high above 
 local RIM_LETTERS = { { 'N', 0, 1 }, { 'E', 1, 0 }, { 'S', 0, -1 }, { 'W', -1, 0 } }
 local GREEN, GLOW = { 150, 255, 180 }, { 150, 255, 180 }
 
--- ------------------------------------------------------------------ zoom (the Zoom Keys; the numpad's + and - by default)
--- The range steps through ZOOMS; the Arsenal range is where it starts, and the last zoom is remembered between
--- launches: by the options menu's Range row, or (an older loader without the menu) next to my log ("<range> <the
--- Arsenal range it was zoomed from>": a new Arsenal pick starts over).
+-- ------------------------------------------------------------------ zoom (the Zoom Keys; numpad + and - by default)
+-- The range steps through ZOOMS, starting at the Arsenal range. The last zoom is remembered between launches by the
+-- options menu's Range row, or, on a loader without the menu, in a file next to my log ("<range> <the Arsenal range
+-- it was zoomed from>", so a new Arsenal pick starts over).
 local ZOOMS = { 50, 75, 100, 150, 200, 250, 300, 400, 500 }
 local ZOOM_FILE = nil
--- the loader's options menu (Chef Shared Loader 1.0.0 and newer) saves the range itself; the zoom file is only for an
--- older loader without one
+-- the loader's options menu saves the range itself; the zoom file is only for a loader without one
 local HAS_MENU = type(chef.has) == 'function' and chef.has('menu') and type(chef.option) == 'function'
 if not HAS_MENU then
-  -- the loader's folder (chef.log_directory), else %LOCALAPPDATA% (where loaders without the options menu kept it)
+  -- the loader's folder (chef.log_directory), else %LOCALAPPDATA%
   local dir = type(chef.log_directory) == 'string' and chef.log_directory or nil
   if not dir or dir == '' then
     local ok, d = pcall(os.getenv, 'LOCALAPPDATA')
@@ -244,17 +237,16 @@ end
 -- ------------------------------------------------------------------ where the game's map opens
 -- The game anchors its HUD's bottom-right corner 70 px from the right and 44 px from the bottom (at 1440 px; 0.0486
 -- and 0.0306 screen heights). HUD Edge Offset slides that corner between the right edge of the 16:9 area in the middle
--- of the screen (1) and the screen's own edge (0). The map is a circle with a 296 px radius to its rim (0.2056 heights),
--- the same at any HUD Scale; its center sits MAP_DX left of and MAP_DY above the corner at HUD Scale 0.85, and moves a
--- little with HUD Scale (measured at 0.75, 0.85 and 1.25).
+-- of the screen (1) and the screen's own edge (0). The map is a circle with a 296 px radius to its rim (0.2056
+-- heights), the same at any HUD Scale. Its center sits MAP_DX left of and MAP_DY above the corner at HUD Scale 0.85,
+-- and moves a little with HUD Scale (measured at 0.75, 0.85 and 1.25).
 local CORNER_RIGHT, CORNER_BOTTOM, BASE_SCALE = 70 / 1440, 44 / 1440, 0.85
 local MAP_DX, MAP_DY = 254.4 / 1440, 301.3 / 1440
 local DX_PER_SCALE, DY_PER_SCALE = 34 / 1440, 63 / 1440
 local MAP_RIM, MY_RADIUS = 0.2056, 0.19
--- (Test 20) Nothing tells me the map is open (Tests 6-18: I could see a stratagem code and chat in my Helldiver's pose,
--- never the map), and following Tab is messy, so the radar no longer sits where the map opens: it sits just left of the
--- map's rim, its center level with the map's, and follows the HUD settings the same way. MAP_GAP: the space between
--- the two rims, in screen heights.
+-- Nothing readable tells me the map is open (a stratagem code and chat show in my Helldiver's pose, the map never
+-- does), so the radar sits just left of the map's rim, its center level with the map's, and follows the HUD settings
+-- the same way. MAP_GAP: the space between the two rims, in screen heights.
 local MAP_GAP = 0.012
 
 -- The game's HUD settings: saves\<player id>_user_settings.config in the game's folder in %APPDATA%.
@@ -319,8 +311,8 @@ local function apply_kinds()
   if WEAPONS_ON then for id in pairs(CARRIERS) do watch_kinds[id] = true end end
 end
 apply_kinds()
--- Every loot kind, ticked or not, is how the loader tells a small mission from the ship (it never has any). Supplies
--- weapons and structures aren't: I don't know that the ship has none.
+-- Every loot kind, ticked or not, tells the loader a small mission from the ship (which never has loot). Supplies,
+-- weapons and structures don't count: the ship might have them.
 if chef.mission_kinds then
   local loot = {}
   for _, k in ipairs(KINDS) do
@@ -333,9 +325,9 @@ local watch = nil
 local mission_id = 0
 
 -- ------------------------------------------------------------------ the loader's options menu (F9)
--- Every setting again in the menu (with a loader that has one: Chef Shared Loader 1.0.0 and newer). Each row
--- starts at the Arsenal pick; a change applies at once and is saved by the loader. The keys are key rows the player
--- binds by pressing a key; their defaults are the Arsenal keys.
+-- Every setting again in the menu, when the loader has one. Each row starts at the Arsenal pick; a change applies at
+-- once and the loader saves it. The keys are rows the player binds by pressing a key; their defaults are the
+-- Arsenal keys.
 do
   if HAS_MENU then
     chef.title('Treasure Radar')
@@ -435,10 +427,10 @@ local dead = { mission = nil, units = {} }
 local struct_uk = {}
 local next_alive = 0
 
--- Has this structure been destroyed? A fabricator's animation state reaches its kind's dead_state. Every unit is asked
--- whether it has a state machine before its state is read (one without crashes the game when asked; Objective Tracker
--- found a colony fabricator like that), each call under its own unit kind's crash key (one bug hole type that
--- misbehaves can't silence the other three).
+-- Has this structure been destroyed? Either its kind's dead_mesh hides, or its animation state reaches dead_state.
+-- I ask a unit whether it has a state machine before reading its state: asking one without crashes the game, and
+-- some colony fabricators have none. Each call runs under its own unit kind's crash key, so one bug hole type that
+-- misbehaves can't silence the other three.
 local function is_destroyed(u, k, uk)
   if dead.mission ~= chef.world_id() then dead.mission, dead.units = chef.world_id(), {} end
   if dead.units[u] then return true end
@@ -465,12 +457,12 @@ local function is_destroyed(u, k, uk)
 end
 
 -- a weapon up at a Helldiver's hands or back (near them, CARRY_UP above their feet) is carried
--- Expendables (EAT-17, EAT-700, EAT-411, MGX-42, MLS-4X) are thrown down once spent and keep their unit (Test 11).
+-- Expendables (EAT-17, EAT-700, EAT-411, MGX-42, MLS-4X) are thrown down once spent and keep their unit.
 local EXPENDABLE = { ['80932fa0ed6901d3'] = 'EAT-17', ['b2b5e0d185605f9e'] = 'EAT-700', ['7617642765ac38c7'] = 'EAT-411',
   ['b16c9d490aa59b77'] = 'MGX-42', ['5990123d142b16cb'] = 'MLS-4X' }
--- (Test 13, my EAT test) A loaded EAT-17 on the ground is in animation state 2; once fired and thrown down it's in
--- state 0, every mesh still showing. So an expendable on the ground in state 0 is a spent tube and isn't shown. (The
--- others are taken to work the same way until seen otherwise.)
+-- A loaded EAT-17 on the ground is in animation state 2; once fired and thrown down it's in state 0, every mesh still
+-- showing. So an expendable on the ground in state 0 is a spent tube and isn't shown. I take the others to work the
+-- same way.
 local function spent(it)
   if not EXPENDABLE[it.kind] then return false end
   local key = 'x' .. it.kind
@@ -556,8 +548,8 @@ local function rebuild(items)
   end
 end
 
--- has this weapon left the spot it was listed at (more than half a meter)? Its own spot: two of a weapon lying
--- together (an EAT drop) share one marker but not one spot. Asked with the scan's own call and key.
+-- has this weapon left the spot it was listed at (more than half a meter)? Each unit has its own spot: two of a weapon
+-- lying together (an EAT drop) share one marker but not one spot. Asked with the scan's own call and key.
 local function moved(u, p)
   local at = listed_at[u]
   if not at then return false end
@@ -597,8 +589,8 @@ local function check_alive(cam)
 end
 
 -- ------------------------------------------------------------------ drawing helpers
--- Colors only live for one frame in the engine, so each frame gets its own palettes (one per kind, made on first use).
--- Each kind keeps one palette table; its colors are made again on its first use in a frame.
+-- Colors only live for one frame in the engine. Each kind keeps one palette table, and its colors are made again on
+-- its first use in a frame.
 local pals = {}
 local frame_no = 0
 local function palette(k)
@@ -712,7 +704,7 @@ local function draw_radar(px, cam, cx, cy, R)
     if s.n > 0 and cfg.kinds[k.id] and not (edge and k.supply) then
       if edge then dx, dy = dx / d * range_now, dy / d * range_now end
       dx, dy = turn(dx, dy)
-      -- (Test 30: every icon about the same size, bigger near me and smaller far off, and the zoom changes it)
+      -- every kind's icon about the same size, bigger near me and smaller far off (so the zoom changes it):
       -- 1.3x at my feet down to 0.7x at the range; on the edge (beyond the range) 0.6x
       local cell = max(1, px * (edge and 0.6 or (1.3 - 0.6 * min(1, d / range_now))))
       local half = 5.5 * cell
@@ -769,10 +761,11 @@ local function draw_radar(px, cam, cx, cy, R)
 end
 
 -- ------------------------------------------------------------------ the ledger
--- Left of the radar, its bottom level with the radar's. (0.6.0 Test 23) The ledger as tiles: each kind a small square, its icon over its count (a check mark once it's
--- cleared), with a thin line in its color along the top. Rows, top to bottom: the enemy structures, then Super Credits,
--- Medals and Requisition Slips, then the samples, then the supplies. A row shows the kinds the mission has (seen at
--- least once), right-aligned beside the radar; a cleared kind keeps its tile, dimmed, with a gray line.
+-- Left of the radar, its bottom level with the radar's. Each kind is a small tile, its icon over its count (a check
+-- mark once it's cleared), with a thin line in its color along the top. Rows, top to bottom: the enemy structures,
+-- then Super Credits, Medals and Requisition Slips, then the samples, then the supplies. A row shows the kinds the
+-- mission has (seen at least once), right-aligned beside the radar; a cleared kind keeps its tile, dimmed, with a gray
+-- line.
 local LEDGER_ROWS = {
   { 'fabricator', 'bulkfab', 'ilship', 'bughole' },
   { 'credit', 'medal', 'requisition' },
@@ -842,8 +835,8 @@ local function draw_ledger(px, right_x, bottom)
 end
 
 -- ------------------------------------------------------------------ world markers
--- Each pile's icon over it in the world within cfg.markers meters, with how far it is and, for a pile, how many; supplies
--- smaller. Through my view camera (the loader's world_to_screen). F8 hides or shows them.
+-- Each pile's icon over it in the world within cfg.markers meters, with how far it is and, for a pile, how many.
+-- Placed through my view camera (the loader's world_to_screen). The Markers Key hides or shows them.
 local function draw_markers(px, cam, w, h)
   if not (cfg.markers and markers_on and chef.world_to_screen) then return end
   local small = max(1, floor(px * 2 / 3))
@@ -860,7 +853,7 @@ local function draw_markers(px, cam, w, h)
         if sx and sx > 0 and sx < w and sy > 0 and sy < h then
           local k = p.kind
           local pal = palette(k)
-          local half = 4.1 * px                -- (Test 30) every kind the same size
+          local half = 4.1 * px                -- every kind the same size
           local tex, hw = k.texture, half
           if k.weapon then
             tex = TEXTURES.weapons[p.wid] or TEXTURES.weapon_generic
@@ -884,7 +877,7 @@ end
 local function read_keys()
   if any_key(cfg.hide) then hidden = not hidden; chef.log('radar %s (%s)', hidden and 'hidden' or 'shown', cfg.hide[1]) end
   -- tapping Tab twice quickly hides or shows the radar and the ledger, like the Hide Key (the two taps open and close
-  -- the game's map again, so it ends up closed); a third tap starts over. Unticking Double-Tap Tab To Hide turns this off.
+  -- the game's map, so it ends up closed); a third tap starts over
   if cfg.tab and chef.key_pressed('tab') then
     local t = chef.time()
     if tab_last and t - tab_last <= DOUBLE_TAP then
@@ -903,7 +896,7 @@ end
 -- The drop: nothing is drawn while my camera falls fast and steadily (the Hellpod comes down at 200+ m/s for seconds,
 -- a reinforcement too) and for a moment after it lands, and at a mission's start not until the first drop has landed
 -- (or DROP_NONE s went by without one). A camera that jumps for a frame or two (aiming, a dive, a hit) isn't a drop:
--- the fall has to last DROP_FOR s. (Test 10 hid on any one fast frame, and the radar blinked out now and then.)
+-- the fall has to last DROP_FOR s, or the radar would blink out now and then.
 local DROP_SPEED, DROP_FOR, DROP_AFTER, DROP_NONE = 40, 0.4, 2.5, 12
 local drop = { mission = nil }
 local function dropping(cam)
@@ -992,7 +985,7 @@ function M.update(dt)
   if hidden then return end
   local cx, cy = layout(w, h)
   local R = MY_RADIUS * h * cfg.scale
-  -- (Test 20) beside the map, not under it: left of the map's rim by MAP_GAP, its center level with the map's
+  -- beside the map, not under it: left of the map's rim by MAP_GAP, its center level with the map's
   cx = cx - MAP_RIM * h - MAP_GAP * h - R
   local ui = px * cfg.scale
   if M.logged ~= mission_id then

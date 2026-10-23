@@ -2,7 +2,7 @@
 dropped weapon is pinged), cut down to the weapon itself and given the same dark outline as my pickup icons.
 
 The icons are game files, so they aren't in this repository: `weapon_icons/<unit id>.png` comes from the player's game
-(tools/extract_weapon_icons.py) or from the release zip. The red channel is the weapon (green holds an ammo symbol);
+(extracted with Filediver) or from the release zip. The red channel is the weapon (green holds an ammo symbol);
 some have a small backpack badge in the top-right corner, which is dropped: only the weapon's own shape is kept.
 A weapon with no game icon (the SG-88) gets my generic one."""
 import os
