@@ -5,7 +5,7 @@ import math
 from PIL import Image, ImageDraw
 
 GRID = 36
-WIDTH = {'ammo': 36, 'grenade': 32, 'stim': 36, 'medal': 26, 'common': 36, 'rare': 36, 'super': 36, 'credit': 36, 'requisition': 36}
+WIDTH = {'fabricator': 36, 'bulkfab': 36, 'ilship': 36, 'bughole': 36, 'titanhole': 36, 'objective': 36, 'ammo': 36, 'grenade': 32, 'stim': 36, 'medal': 26, 'common': 36, 'rare': 36, 'super': 36, 'credit': 36, 'requisition': 36}
 
 
 def octagon(cx, cy, rx, ry):
@@ -111,7 +111,59 @@ def draw_stim(d):
 
 
 
-DRAW = {'ammo': draw_ammo, 'grenade': draw_grenade, 'stim': draw_stim, 'medal': draw_medal, 'common': draw_common, 'rare': draw_rare, 'super': draw_super, 'credit': draw_credit, 'requisition': draw_requisition}
+def draw_fabricator(d):
+    # a bot fabricator (Treasure Map 1.4.0's): a factory with a sawtooth roof, a smokestack and a dark door
+    d.rectangle((0, 17, 36, 35), fill=255)
+    for x in (0, 9, 18):
+        d.polygon([(x, 17.5), (x + 9, 8), (x + 9, 17.5)], fill=255)
+    d.rectangle((28, 1, 34, 18), fill=255)
+    d.rectangle((13, 24, 23, 35), fill=0)
+
+
+def draw_bulkfab(d):
+    # a Bulk Fabricator (0.6.0): the fabricator's big brother: a wider hall with four roof teeth, two smokestacks and a
+    # wide dark bay door, so it reads apart from a fabricator at a glance
+    d.rectangle((0, 17, 36, 35), fill=255)
+    for x in (0, 5.5, 11, 16.5):
+        d.polygon([(x, 17.5), (x + 5.5, 9), (x + 5.5, 17.5)], fill=255)
+    d.rectangle((23, 3, 27.5, 18), fill=255)
+    d.rectangle((30.5, 0, 35, 18), fill=255)
+    d.rectangle((5, 24, 31, 35), fill=0)
+
+
+def draw_ilship(d):
+    # an Illuminate warp ship (Treasure Map 1.4.0's): a flat saucer with a dome and a dark band of lights
+    d.ellipse((0, 15, 36, 29), fill=255)
+    d.ellipse((9, 5, 27, 23), fill=255)
+    d.rectangle((4, 21, 32, 22.5), fill=0)
+    for x in (8, 17, 26):
+        d.rectangle((x, 26, x + 2.5, 33), fill=255)
+
+
+def draw_bughole(d):
+    # a bug hole (Treasure Map 1.4.0's tunnel, the one I picked): a low rounded mound with a dark arched mouth
+    d.ellipse((0, 8, 36, 52), fill=255)
+    d.ellipse((11, 15, 25, 33), fill=0)
+    d.rectangle((11, 24, 25, 36), fill=0)
+
+
+def draw_titanhole(d):
+    # (0.6.0 Test 32) a Bile Titan hole: the bug hole's tunnel, wider and lower, with three spikes on its back
+    d.ellipse((0, 12, 36, 52), fill=255)
+    for pts in ([(4, 18), (6, 4), (11, 15)], [(15, 13), (18, 1), (21, 13)], [(25, 15), (30, 4), (32, 18)]):
+        d.polygon(pts, fill=255)
+    d.ellipse((8, 19, 28, 35), fill=0)
+    d.rectangle((8, 27, 28, 36), fill=0)
+
+
+def draw_objective(d):
+    # (0.6.0 Test 32) a side objective (Treasure Map 1.1's): a diamond with an exclamation mark cut out
+    d.polygon([(18, 0), (36, 18), (18, 36), (0, 18)], fill=255)
+    d.polygon([(15.4, 7), (20.6, 7), (19.7, 21.5), (16.3, 21.5)], fill=0)
+    d.rectangle((15.6, 24.2, 20.4, 29), fill=0)
+
+
+DRAW = {'titanhole': draw_titanhole, 'objective': draw_objective, 'bughole': draw_bughole, 'fabricator': draw_fabricator, 'bulkfab': draw_bulkfab, 'ilship': draw_ilship, 'ammo': draw_ammo, 'grenade': draw_grenade, 'stim': draw_stim, 'medal': draw_medal, 'common': draw_common, 'rare': draw_rare, 'super': draw_super, 'credit': draw_credit, 'requisition': draw_requisition}
 
 
 def mask(kind, height):

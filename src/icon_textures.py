@@ -10,6 +10,11 @@ SIZE, FILL = 48, 40     # 48 px textures, so the icons stay crisp at 1440p and 4
 
 
 def icon_image(kid, rgb):
+    return icon_master(kid, rgb).resize((SIZE, SIZE), Image.LANCZOS)
+
+
+def icon_master(kid, rgb):
+    """the icon at 4x (192 px), for shrinking straight to each size the radar draws it at"""
     big, fill = 4 * SIZE, 4 * FILL
     a = icons.mask(kid, fill)
     w, h = a.size
@@ -20,8 +25,7 @@ def icon_image(kid, rgb):
     dark = Image.new('RGBA', (big, big), (12, 12, 12, 255)); dark.putalpha(outline.point(lambda p: round(p * 0.9)))
     img = Image.alpha_composite(img, dark)
     body = Image.new('RGBA', (big, big), tuple(rgb) + (255,)); body.putalpha(mask)
-    img = Image.alpha_composite(img, body)
-    return img.resize((SIZE, SIZE), Image.LANCZOS)
+    return Image.alpha_composite(img, body)
 
 
 def texture_resource(size, height=None):

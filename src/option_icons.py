@@ -147,17 +147,6 @@ def make_markers(m=None):
     return img
 
 
-def make_calibrate():
-    img = canvas(); disc(img, 128, 128, 92)
-    d = ImageDraw.Draw(img)
-    for i in range(48):
-        a = i / 48 * 2 * math.pi
-        x, y = 128 + math.cos(a) * 112, 128 + math.sin(a) * 112
-        d.rectangle((x - 2, y - 2, x + 2, y + 2), fill=MAG)
-    d.rectangle((108, 126, 148, 130), fill=MAG); d.rectangle((126, 108, 130, 148), fill=MAG)
-    return img
-
-
 def make_range(m=None):
     img = canvas(); disc(img, 128, 128, 112); me(img, 128, 128, 1.2)
     d = ImageDraw.Draw(img)
@@ -168,15 +157,104 @@ def make_range(m=None):
 
 
 def make_kind(kid):
+    if kid == 'weapon':
+        return make_weapons()
+    if kid == 'structures':
+        return make_structures()
+    if kid == 'objectives':
+        kid = 'objective'
     img = canvas(); icon(img, kid, 128, 128, 176); return img
+
+
+# ---- 0.6.0: weapons, Still Radar and the keys
+def _weapon(uid):
+    import weapon_textures as wt
+    d = os.path.join(HERE, 'weapon_icons')
+    t = wt.all_textures(d if os.path.isdir(d) else None)
+    return t.get(uid) or t['generic']
+
+
+def make_weapons():
+    """three weapon silhouettes lying on the radar"""
+    img = canvas()
+    disc(img, 128, 128, 112, plain=True)
+    for uid, x, y, w in (('2e9d0bdc48b09e60', 128, 78, 150), ('a8cffb316f0b5c5f', 112, 140, 130), ('80932fa0ed6901d3', 140, 192, 120)):
+        im = _weapon(uid)
+        h = round(w * im.height / im.width)
+        img.alpha_composite(im.resize((w, h), Image.LANCZOS), (int(x - w / 2), int(y - h / 2)))
+    return img
+
+
+def make_structures():
+    """a fabricator and a warp ship on the radar"""
+    img = canvas()
+    disc(img, 128, 128, 112, plain=True)
+    icon(img, 'fabricator', 92, 100, 104)
+    icon(img, 'ilship', 160, 162, 104)
+    return img
+
+
+def make_animation():
+    """the radar with its sweep turning (an arrow round the rim)"""
+    img = canvas(); disc(img, 128, 128, 104)
+    n = radar_textures.SWEEP_FRAMES
+    sw = radar_textures.sweep_frame(round(52 / 360 * n) % n).convert('RGBA').resize((208, 208), Image.LANCZOS)
+    img.alpha_composite(sw, (24, 24))
+    scatter(img, 128, 128, 104); me(img, 128, 128, 1.3)
+    d = ImageDraw.Draw(img)
+    d.arc((10, 10, 246, 246), 300, 30, fill=YEL, width=8)
+    tip = math.radians(30)
+    tx, ty = 128 + math.cos(tip) * 118, 128 + math.sin(tip) * 118
+    d.polygon([(tx - 2, ty + 16), (tx - 14, ty - 8), (tx + 14, ty - 4)], fill=YEL)
+    return img
+
+
+def keycap(img, text, cx, cy, w=None, h=96):
+    """a keyboard key with its label"""
+    d = ImageDraw.Draw(img)
+    f = font(44 if len(text) <= 3 else (34 if len(text) <= 5 else 26))
+    tw = d.textlength(text, font=f)
+    w = w or max(h, int(tw + 44))
+    x0, y0 = cx - w // 2, cy - h // 2
+    d.rounded_rectangle((x0, y0 + 8, x0 + w, y0 + h + 8), radius=16, fill=(6, 6, 8, 255))
+    d.rounded_rectangle((x0, y0, x0 + w, y0 + h), radius=16, fill=(58, 60, 64, 255), outline=(150, 152, 156, 255), width=3)
+    d.rounded_rectangle((x0 + 10, y0 + 8, x0 + w - 10, y0 + h - 18), radius=10, fill=(78, 80, 86, 255))
+    bb = d.textbbox((0, 0), text, font=f)
+    d.text((cx - (bb[2] - bb[0]) / 2 - bb[0], y0 + (h - 18) / 2 - (bb[3] - bb[1]) / 2 - bb[1] + 4), text, font=f, fill=(245, 245, 245, 255))
+
+
+def make_key(text, caption=None):
+    img = canvas()
+    if text == 'Off':
+        keycap(img, 'Off', 128, 112 if caption else 128)
+        d = ImageDraw.Draw(img); d.line((50, 60, 206, 196), fill=(230, 70, 60, 255), width=10)
+    else:
+        keycap(img, text, 128, 112 if caption else 128)
+    if caption:
+        label(img, caption, 178, 30)
+    return img
+
+
+def make_keypair(a, b):
+    img = canvas()
+    keycap(img, a, 128, 74, h=84)
+    keycap(img, b, 128, 176, h=84)
+    return img
+
+
+def make_tabhold():
+    img = canvas()
+    keycap(img, 'Tab', 128, 104)
+    label(img, 'TAP TAP', 166, 34)
+    return img
 
 
 def all_images(kinds):
     out = {'core': make_core(), 'ledger': make_ledger(), 'opacity': make_opacity(), 'size': make_size(), 'rotate': make_rotate(),
-           'markers': make_markers(), 'calibrate': make_calibrate(), 'range': make_range()}
+           'markers': make_markers(), 'range': make_range()}
     for pct in (100, 75, 50, 25, 0): out[f'opacity_{pct}'] = make_opacity(pct)
     for k in ('small', 'medium', 'large'): out[f'size_{k}'] = make_size(k)
-    for m in (25, 50, 100): out[f'markers_{m}'] = make_markers(m)
+    for m in (25, 50, 100, 200): out[f'markers_{m}'] = make_markers(m)
     for m in (75, 100, 150, 200, 250, 300): out[f'range_{m}'] = make_range(m)
     for k in kinds: out[k] = make_kind(k)
     return out
