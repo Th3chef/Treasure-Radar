@@ -1,26 +1,34 @@
-"""Treasure Radar release art: the hero scene (the sonar radar with its sweep, the pickups lighting up and the pill
-ledger, over a blurred shot of the game). hero(W, H, cx, cy, r) -> RGBA image; the text is added by cards.py."""
+"""Treasure Radar release art: the hero scene (the sonar radar with its sweep, the pickups, enemy structures and
+weapons lighting up, and the ledger's tiles, over a blurred shot of the game). hero(W, H, cx, cy, r) -> RGBA image; the
+text is added by cards.py. The weapon silhouettes come from weapon_icons/ (the game's own marker icons, see
+weapon_textures.py); a missing one falls back to my generic shape."""
 import math, os, sys
 from PIL import Image, ImageDraw, ImageFilter, ImageEnhance, ImageFont
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.dirname(HERE))
-import icon_textures, radar_textures
+import icon_textures, radar_textures, weapon_textures
 
 FONT = os.path.join(os.path.dirname(HERE), 'fonts', 'Poppins-Bold.ttf')   # SIL Open Font License
 RGB = {'credit': (115, 233, 242), 'medal': (255, 221, 31), 'common': (95, 220, 60), 'rare': (255, 151, 64),
        'super': (255, 114, 211), 'requisition': (244, 247, 56), 'ammo': (255, 234, 128), 'grenade': (135, 170, 45),
-       'stim': (60, 140, 255)}
+       'stim': (60, 140, 255), 'fabricator': (190, 20, 30), 'bulkfab': (190, 20, 30), 'ilship': (190, 20, 30),
+       'bughole': (190, 20, 30)}
+SUPPLY = ('ammo', 'grenade', 'stim')
+STRUCT = ('fabricator', 'bulkfab', 'ilship', 'bughole')
 LIGHT = (150, 255, 180)
 SWEEP_AT = 52                       # degrees clockwise from north where the sweep's line is in the pictures
 
-# pickups on the radar: (east, north) as a fraction of the radius, kind, pile count
+# on the radar: (east, north) as a fraction of the radius, kind (or 'w:<weapon unit id>'), pile count
 PICKUPS = [(0.30, 0.58, 'medal', 1), (0.62, 0.30, 'credit', 1), (-0.48, 0.40, 'common', 3), (0.18, -0.36, 'rare', 1),
-           (-0.30, -0.52, 'super', 1), (-0.70, -0.18, 'requisition', 1), (0.52, -0.55, 'medal', 2), (-0.10, 0.22, 'ammo', 4),
-           (0.40, 0.05, 'grenade', 2), (-0.36, 0.05, 'stim', 1), (0.12, 0.74, 'common', 1), (0.66, -0.10, 'ammo', 1),
-           (0.90, 0.40, 'rare', 1), (-0.84, 0.48, 'medal', 1)]
-LEDGER = [('credit', 1), ('medal', 4), ('common', 4), ('rare', 2), ('super', 0), ('requisition', 1), ('ammo', 5),
-          ('grenade', 2), ('stim', 1)]
+           (-0.30, -0.52, 'super', 1), (-0.72, -0.12, 'requisition', 1), (0.48, -0.58, 'medal', 2), (-0.10, 0.22, 'ammo', 4),
+           (0.40, 0.04, 'grenade', 2), (-0.34, 0.04, 'stim', 1), (0.10, 0.76, 'common', 1),
+           (-0.58, 0.70, 'fabricator', 1), (0.82, -0.30, 'bughole', 2), (-0.80, -0.48, 'ilship', 1),
+           (0.70, 0.62, 'w:2e9d0bdc48b09e60', 1), (-0.04, -0.66, 'w:a6a735accb4a327f', 1)]
+# the ledger's tile rows, top to bottom (as in game): structures, then credits, medals and slips, samples, supplies
+LEDGER_ROWS = [[('fabricator', 1), ('ilship', 1), ('bughole', 2)], [('credit', 1), ('medal', 4), ('requisition', 1)],
+               [('common', 4), ('rare', 2), ('super', 0)], [('ammo', 5), ('grenade', 2), ('stim', 1)]]
+WEAPON_ICONS = os.path.join(os.path.dirname(HERE), 'weapon_icons')
 
 
 def background(W, H):
@@ -41,10 +49,26 @@ def background(W, H):
 
 
 def icon(kid, size, alpha=1.0):
-    ic = icon_textures.icon_image(kid, RGB[kid]).convert('RGBA').resize((size, size), Image.LANCZOS)
+    ic = icon_textures.icon_master(kid, RGB[kid]).convert('RGBA').resize((size, size), Image.LANCZOS)
     if alpha < 1:
         ic.putalpha(ic.getchannel('A').point(lambda v: int(v * alpha)))
     return ic
+
+
+_weapons = {}
+
+
+def weapon(uid, h, alpha=1.0):
+    """a weapon's silhouette, h px tall (its texture is 128 x 48, white with the dark outline)"""
+    if uid not in _weapons:
+        path = os.path.join(WEAPON_ICONS, uid + '.png')
+        mask = weapon_textures.silhouette(path) if os.path.exists(path) else None
+        _weapons[uid] = weapon_textures.texture(mask if mask is not None else weapon_textures.generic(), master=True)
+    w = int(h * weapon_textures.W / weapon_textures.H)
+    im = _weapons[uid].resize((w, h), Image.LANCZOS)
+    if alpha < 1:
+        im.putalpha(im.getchannel('A').point(lambda v: int(v * alpha)))
+    return im
 
 
 def text(img, xy, s, size, rgb, anchor='lm'):
@@ -78,16 +102,24 @@ def radar(r):
     inner = r * 0.92
     h = max(14, int(r * 0.15))
     sweep = math.radians(SWEEP_AT)
-    for x, y, kid, cnt in sorted(PICKUPS, key=lambda p: p[2] in ('ammo', 'grenade', 'stim'), reverse=True):
+    # drawn as in game: supplies at the bottom, then structures, the loot, and the weapons on top
+    order = lambda p: 0 if p[2] in SUPPLY else (1 if p[2] in STRUCT else (3 if p[2][:2] == 'w:' else 2))
+    for x, y, kid, cnt in sorted(PICKUPS, key=order):
         px, py = c + x * inner, c - y * inner
         since = (sweep - math.atan2(x, y)) % (2 * math.pi)
         pulse = math.exp(-since / 0.5)
-        sz = int((h * 0.78 if kid in ('ammo', 'grenade', 'stim') else h) * (1 + 0.12 * pulse))
+        d0 = math.hypot(x, y)
+        # every kind about the same size: bigger near me, smaller toward the edge (1.3x down to 0.7x in game)
+        sz = int(h * (1.18 - 0.36 * d0) * (1 + 0.12 * pulse))
         if pulse > 0.08:
             g = int(sz * 1.2)
             halo = Image.new('RGBA', (4 * g, 4 * g), (0, 0, 0, 0))
             ImageDraw.Draw(halo).ellipse((g, g, 3 * g, 3 * g), fill=LIGHT + (int(140 * pulse),))
             out.alpha_composite(halo.filter(ImageFilter.GaussianBlur(g / 2.2)), (int(px - 2 * g), int(py - 2 * g)))
+        if kid[:2] == 'w:':
+            wim = weapon(kid[2:], int(sz * 0.75), 0.75 + 0.25 * pulse)
+            out.alpha_composite(wim, (int(px - wim.width / 2), int(py - wim.height / 2)))
+            continue
         out.alpha_composite(icon(kid, sz, 0.75 + 0.25 * pulse), (int(px - sz / 2), int(py - sz / 2)))
         if cnt > 1:
             text(out, (px + sz * 0.62, py + sz * 0.05), str(cnt), sz * 0.58, RGB[kid])
@@ -102,27 +134,35 @@ def radar(r):
 
 
 def ledger(scale):
-    """the ledger's pills as drawn in game, `scale` px per game cell"""
-    lh, gap, lw = 12 * scale, 2 * scale, 32 * scale
-    W, H = int(lw + 4), int(len(LEDGER) * (lh + gap) - gap + 4)
+    """the ledger's tiles as drawn in game, `scale` px per game cell: each kind a small square with a line in its color
+    along the top, its icon and how many are left; a cleared kind dims, with a gray line and a check mark"""
+    TW, TH, GAP, ROW, ISZ = 15 * scale, 17 * scale, 1.5 * scale, 3 * scale, 8.5 * scale
+    n = max(len(r) for r in LEDGER_ROWS)
+    W = int(n * TW + (n - 1) * GAP + 4)
+    H = int(len(LEDGER_ROWS) * TH + (len(LEDGER_ROWS) - 1) * ROW + 4)
     img = Image.new('RGBA', (W, H), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
-    f = ImageFont.truetype(FONT, int(8.6 * scale))
-    for i, (kid, left) in enumerate(LEDGER):
-        y0 = 2 + i * (lh + gap)
-        done = left == 0
-        d.rounded_rectangle((2, y0, 2 + lw, y0 + lh), radius=lh / 2, fill=(8, 10, 12, 120 if done else 205),
-                            outline=(80, 80, 80, 170) if done else RGB[kid] + (235,), width=max(2, int(scale * 0.75)))
-        ic = icon(kid, int(9.5 * scale), 0.4 if done else 1)
-        img.alpha_composite(ic, (int(2 + 2.5 * scale), int(y0 + (lh - 9.5 * scale) / 2)))
-        if done:
-            cs = 7.5 * scale
-            x1, y1 = 2 + lw - 4.5 * scale - cs, y0 + (lh - cs) / 2
-            d.line((x1, y1 + cs * 0.55, x1 + cs * 0.38, y1 + cs * 0.9, x1 + cs, y1 + cs * 0.15), fill=(140, 230, 140, 255),
-                   width=max(2, int(scale * 1.1)), joint='curve')
-        else:
-            t = str(left)
-            d.text((2 + lw - 5 * scale, y0 + lh / 2), t, font=f, fill=(245, 245, 245, 255), anchor='rm')
+    f = ImageFont.truetype(FONT, int(5.6 * scale))
+    line = max(2, int(scale * 0.9 + 0.5))
+    for ri, row in enumerate(LEDGER_ROWS):
+        y0 = 2 + ri * (TH + ROW)
+        x0 = W - 2 - len(row) * TW - (len(row) - 1) * GAP          # right-aligned beside the radar
+        for kid, left in row:
+            done = left == 0
+            d.rounded_rectangle((x0, y0, x0 + TW, y0 + TH), radius=2.2 * scale, fill=(8, 12, 10, 130 if done else 205))
+            d.rectangle((x0 + 1.2 * scale, y0, x0 + TW - 1.2 * scale, y0 + line - 1),
+                        fill=(90, 90, 90, 230) if done else RGB[kid] + (230,))
+            ic = icon(kid, int(ISZ), 0.4 if done else 1)
+            img.alpha_composite(ic, (int(x0 + (TW - ISZ) / 2), int(y0 + 1.9 * scale)))
+            cy = y0 + TH - 3.5 * scale
+            if done:
+                cs = 6 * scale
+                x1, y1 = x0 + (TW - cs) / 2, cy - cs * 0.5
+                d.line((x1, y1 + cs * 0.55, x1 + cs * 0.38, y1 + cs * 0.9, x1 + cs, y1 + cs * 0.15), fill=(140, 230, 140, 255),
+                       width=max(2, int(scale * 1.1)), joint='curve')
+            else:
+                d.text((x0 + TW / 2, cy), str(left), font=f, fill=(245, 245, 245, 255), anchor='mm')
+            x0 += TW + GAP
     return img
 
 

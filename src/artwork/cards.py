@@ -2,7 +2,7 @@
 social preview (1280x640) and the AyakaMods cover (1600x1000, everything inside the middle that the site's mod cards
 show). The scene comes from hero.py; the title, version badge and text are HTML rendered with Playwright Chromium
 (Anton + Barlow Condensed in fonts/, SIL Open Font License, from @fontsource).
-python cards.py <out dir> [version badge, e.g. 0.5]"""
+python cards.py <out dir> [version badge, e.g. 0.6]"""
 import base64, io, os, sys
 from playwright.sync_api import sync_playwright
 import hero
@@ -12,8 +12,8 @@ FONTS = {'Anton': 'fonts/anton-latin-400-normal.woff2',
          'Barlow Condensed': 'fonts/barlow-condensed-latin-600-normal.woff2',
          'Barlow Condensed B': 'fonts/barlow-condensed-latin-800-normal.woff2'}
 
-TAGLINE = 'Every sample, medal, Super Credit, Requisition Slip and supply around you, on a sonar radar where your map opens'
-FEATURES = ['SONAR SWEEP', 'LOOT LEDGER', 'WORLD MARKERS', 'ZOOM & ROTATE', 'FITS YOUR HUD']
+TAGLINE = 'Every sample, medal, Super Credit, supply, enemy structure and dropped weapon around you, on a sonar radar beside your map'
+FEATURES = ['SONAR SWEEP', 'LOOT LEDGER', 'ENEMY STRUCTURES', 'DROPPED WEAPONS', 'WORLD MARKERS', 'F9 SETTINGS']
 
 
 def b64(path_or_img):
@@ -60,7 +60,7 @@ def feats(size):
 
 def main():
     out = sys.argv[1]
-    ver = sys.argv[2] if len(sys.argv) > 2 else '0.5'
+    ver = sys.argv[2] if len(sys.argv) > 2 else '0.6'
     os.makedirs(out, exist_ok=True)
     jobs = []
     # square thumbnail: the title at the top, the radar and ledger in the middle, the tagline at the bottom
@@ -96,7 +96,7 @@ def main():
       </div>""" % {'v': ver, 't': TAGLINE, 'f': feats(20)}))
     # AyakaMods cover 1.6:1: everything inside the middle 1190x800 (the mod cards crop it to 1.2:1 .. 2:1)
     W, H = 1600, 1000
-    bg = hero.hero(W, H, 1120, 500, 285)
+    bg = hero.hero(W, H, 1200, 500, 270)
     jobs.append(('AyakaMods-Cover-1600x1000.png', W, H, bg, """
       <div class="plate" style="left:226px;top:168px;width:440px;padding:32px 32px 34px">
         <div class="title" style="font-size:90px">Treasure<br>Radar</div>
