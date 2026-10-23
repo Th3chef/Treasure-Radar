@@ -4,20 +4,26 @@ labels: [bug]
 body:
   - type: markdown
     attributes:
-      value: Thanks for the report! Please attach treasure_radar.log from %LOCALAPPDATA% (type %LOCALAPPDATA% into the File Explorer address bar and press Enter). It shows the options you picked, your HUD settings, what it found in the mission and any errors.
+      value: Thanks for the report! Please attach treasure_radar.log and chef_loader.log from %APPDATA%\Arrowhead\Helldivers2 (type that into the File Explorer address bar and press Enter). They show the options you picked, your HUD settings, what it found in the mission and any errors.
   - type: input
     id: version
     attributes:
       label: Mod version
-      placeholder: 0.5.1
+      placeholder: 0.6.0
     validations:
       required: true
   - type: textarea
     id: options
     attributes:
       label: Options
-      description: Which options you ticked (Loot Ledger, Opacity, Size, Rotate With View, World Markers, Range) and which kinds.
+      description: Which options you ticked (Loot Ledger, Opacity, Size, Rotate With View, World Markers, Range, Radar Animation, the keys) and which kinds (Weapons and Enemy Structures included), and anything you changed in the F9 menu.
       placeholder: "Core, Loot Ledger, Opacity 75%, Size Small, World Markers 50 m; all kinds."
+  - type: input
+    id: loader
+    attributes:
+      label: Chef Shared Loader version
+      description: The first line of chef_loader.log says it.
+      placeholder: 1.0.0
     validations:
       required: true
   - type: input
@@ -47,4 +53,4 @@ body:
     id: logs
     attributes:
       label: Logs
-      description: Drag treasure_radar.log here.
+      description: Drag treasure_radar.log and chef_loader.log here.
