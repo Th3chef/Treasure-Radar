@@ -2,9 +2,11 @@
 social preview (1280x640) and the AyakaMods cover (1600x1000, everything inside the middle that the site's mod cards
 show). The scene comes from hero.py; the title, version badge and text are HTML rendered with Playwright Chromium
 (Anton + Barlow Condensed in fonts/, SIL Open Font License, from @fontsource).
-python cards.py <out dir> [version badge, e.g. 0.6]"""
+python cards.py <out dir> [version badge, e.g. 0.7] [--html]
+--html writes each picture as an HTML page of its exact size (<name>.html) instead, for any browser to screenshot
+(headless Chrome or Edge: --headless --hide-scrollbars --window-size=W,H --screenshot=<name>.png <page>); then
+python cards.py <out dir> --thumb makes the 512x512 Arsenal thumbnail from thumbnail_1254.png."""
 import base64, io, os, sys
-from playwright.sync_api import sync_playwright
 import hero
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -12,8 +14,8 @@ FONTS = {'Anton': 'fonts/anton-latin-400-normal.woff2',
          'Barlow Condensed': 'fonts/barlow-condensed-latin-600-normal.woff2',
          'Barlow Condensed B': 'fonts/barlow-condensed-latin-800-normal.woff2'}
 
-TAGLINE = 'Every sample, medal, Super Credit, supply, enemy structure and dropped weapon around you, on a sonar radar beside your map'
-FEATURES = ['SONAR SWEEP', 'LOOT LEDGER', 'ENEMY STRUCTURES', 'DROPPED WEAPONS', 'WORLD MARKERS', 'F9 SETTINGS']
+TAGLINE = 'Every sample, medal, Super Credit and supply, plus the enemies and squad around you, on a sonar radar beside your map'
+FEATURES = ['SONAR SWEEP', 'LOOT LEDGER', 'ENEMIES', 'SQUAD & SEAF', 'ENEMY STRUCTURES', 'DROPPED WEAPONS', 'WORLD MARKERS']
 
 
 def b64(path_or_img):
@@ -45,9 +47,13 @@ body { width:%(W)dpx; height:%(H)dpx; overflow:hidden; background:#000; position
 """
 
 
-def render(page, W, H, bg, body):
-    html = '<html><head><style>%s\n%s</style></head><body><div class="bg"></div>%s</body></html>' % (
+def page_html(W, H, bg, body):
+    return '<html><head><meta charset="utf-8"><style>%s\n%s</style></head><body><div class="bg"></div>%s</body></html>' % (
         font_css(), CSS % {'W': W, 'H': H, 'bg': b64(bg)}, body)
+
+
+def render(page, W, H, bg, body):
+    html = page_html(W, H, bg, body)
     page.set_viewport_size({'width': W, 'height': H})
     page.set_content(html)
     page.wait_for_timeout(300)
@@ -58,10 +64,21 @@ def feats(size):
     return '<div class="feat" style="font-size:%dpx">%s</div>' % (size, ''.join('<span>%s</span>' % f for f in FEATURES))
 
 
+def thumb(out):
+    # the Arsenal thumbnail inside the mod zip: 512x512 from the 1254 art
+    from PIL import Image
+    Image.open(os.path.join(out, 'thumbnail_1254.png')).convert('RGB').resize((512, 512), Image.LANCZOS).save(
+        os.path.join(out, 'thumbnail.png'))
+    print('thumbnail.png')
+
+
 def main():
     out = sys.argv[1]
-    ver = sys.argv[2] if len(sys.argv) > 2 else '0.6'
+    pos = [a for a in sys.argv[2:] if not a.startswith('--')]
+    ver = pos[0] if pos else '0.7'
     os.makedirs(out, exist_ok=True)
+    if '--thumb' in sys.argv:
+        return thumb(out)
     jobs = []
     # square thumbnail: the title at the top, the radar and ledger in the middle, the tagline at the bottom
     W = H = 1254
@@ -104,6 +121,13 @@ def main():
         <div class="tag" style="font-size:28px">%(t)s</div>
         <div style="margin-top:22px">%(f)s</div>
       </div>""" % {'v': ver, 't': TAGLINE, 'f': feats(21)}))
+    if '--html' in sys.argv:
+        for name, W, H, bg, body in jobs:
+            page = os.path.join(out, name[:-4] + '.html')
+            open(page, 'w', encoding='utf-8').write(page_html(W, H, bg, body))
+            print('%s %d %d' % (page, W, H))
+        return
+    from playwright.sync_api import sync_playwright
     with sync_playwright() as p:
         b = p.chromium.launch()
         page = b.new_page()
@@ -111,11 +135,7 @@ def main():
             open(os.path.join(out, name), 'wb').write(render(page, W, H, bg, body))
             print(name)
         b.close()
-    # the Arsenal thumbnail inside the mod zip: 512x512 from the 1254 art
-    from PIL import Image
-    Image.open(os.path.join(out, 'thumbnail_1254.png')).convert('RGB').resize((512, 512), Image.LANCZOS).save(
-        os.path.join(out, 'thumbnail.png'))
-    print('thumbnail.png')
+    thumb(out)
 
 
 if __name__ == '__main__':

@@ -13,7 +13,8 @@ FONT = os.path.join(os.path.dirname(HERE), 'fonts', 'Poppins-Bold.ttf')   # SIL 
 RGB = {'credit': (115, 233, 242), 'medal': (255, 221, 31), 'common': (95, 220, 60), 'rare': (255, 151, 64),
        'super': (255, 114, 211), 'requisition': (244, 247, 56), 'ammo': (255, 234, 128), 'grenade': (135, 170, 45),
        'stim': (60, 140, 255), 'fabricator': (190, 20, 30), 'bulkfab': (190, 20, 30), 'ilship': (190, 20, 30),
-       'bughole': (190, 20, 30)}
+       'bughole': (190, 20, 30), 'enemy': (255, 70, 50), 'enemydot': (255, 70, 50), 'frienddot': (80, 170, 255),
+       'squaddot': (60, 230, 120)}
 SUPPLY = ('ammo', 'grenade', 'stim')
 STRUCT = ('fabricator', 'bulkfab', 'ilship', 'bughole')
 LIGHT = (150, 255, 180)
@@ -25,6 +26,12 @@ PICKUPS = [(0.30, 0.58, 'medal', 1), (0.62, 0.30, 'credit', 1), (-0.48, 0.40, 'c
            (0.40, 0.04, 'grenade', 2), (-0.34, 0.04, 'stim', 1), (0.10, 0.76, 'common', 1),
            (-0.58, 0.70, 'fabricator', 1), (0.82, -0.30, 'bughole', 2), (-0.80, -0.48, 'ilship', 1),
            (0.70, 0.62, 'w:2e9d0bdc48b09e60', 1), (-0.04, -0.66, 'w:a6a735accb4a327f', 1)]
+# the enemies, SEAF troopers and squadmates over the pickups: (east, north), dot kind, tier (3 = a heavy's skull, 2 a
+# medium dot, 1 a small one); as in game they don't light up with the sweep
+FOES = [(0.58, -0.08, 'enemydot', 1), (0.66, 0.00, 'enemydot', 1), (0.63, -0.19, 'enemydot', 1), (0.73, -0.12, 'enemydot', 2),
+        (0.54, 0.10, 'enemydot', 1), (0.80, 0.16, 'enemy', 3), (-0.20, 0.60, 'enemydot', 2), (-0.11, 0.53, 'enemydot', 1),
+        (-0.29, 0.51, 'enemydot', 1), (-0.52, -0.24, 'enemy', 3), (0.05, -0.20, 'frienddot', 2), (0.13, -0.13, 'frienddot', 2),
+        (-0.03, -0.11, 'frienddot', 2), (-0.15, -0.03, 'squaddot', 2), (0.09, 0.09, 'squaddot', 2)]
 # the ledger's tile rows, top to bottom (as in game): structures, then credits, medals and slips, samples, supplies
 LEDGER_ROWS = [[('fabricator', 1), ('ilship', 1), ('bughole', 2)], [('credit', 1), ('medal', 4), ('requisition', 1)],
                [('common', 4), ('rare', 2), ('super', 0)], [('ammo', 5), ('grenade', 2), ('stim', 1)]]
@@ -82,8 +89,11 @@ def text(img, xy, s, size, rgb, anchor='lm'):
     img.alpha_composite(col)
 
 
-def radar(r):
-    """the radar as drawn in game: the sonar panel, the sweep, the pickups (brighter just behind the sweep) and me"""
+def radar(r, sweep_at=SWEEP_AT, pickups=None, foes=None):
+    """the radar as drawn in game: the sonar panel, the sweep, the pickups (brighter just behind the sweep) and me;
+    sweep_at, pickups and foes default to the pictures' (clip.py animates them)"""
+    pickups = PICKUPS if pickups is None else pickups
+    foes = FOES if foes is None else foes
     pad = r // 8
     S = 2 * (r + pad)
     out = Image.new('RGBA', (S, S), (0, 0, 0, 0))
@@ -96,15 +106,15 @@ def radar(r):
     disc.putalpha(disc.getchannel('A').point(lambda v: min(255, int(v * 1.25))))
     out.alpha_composite(disc.resize((2 * r, 2 * r), Image.LANCZOS), (pad, pad))
     n = radar_textures.SWEEP_FRAMES
-    sw = radar_textures.sweep_frame(round(SWEEP_AT / 360 * n) % n).resize((2 * r, 2 * r), Image.LANCZOS)
+    sw = radar_textures.sweep_frame(round(sweep_at / 360 * n) % n).resize((2 * r, 2 * r), Image.LANCZOS)
     out.alpha_composite(sw, (pad, pad))
     c = pad + r
     inner = r * 0.92
     h = max(14, int(r * 0.15))
-    sweep = math.radians(SWEEP_AT)
+    sweep = math.radians(sweep_at)
     # drawn as in game: supplies at the bottom, then structures, the loot, and the weapons on top
     order = lambda p: 0 if p[2] in SUPPLY else (1 if p[2] in STRUCT else (3 if p[2][:2] == 'w:' else 2))
-    for x, y, kid, cnt in sorted(PICKUPS, key=order):
+    for x, y, kid, cnt in sorted(pickups, key=order):
         px, py = c + x * inner, c - y * inner
         since = (sweep - math.atan2(x, y)) % (2 * math.pi)
         pulse = math.exp(-since / 0.5)
@@ -123,6 +133,12 @@ def radar(r):
         out.alpha_composite(icon(kid, sz, 0.75 + 0.25 * pulse), (int(px - sz / 2), int(py - sz / 2)))
         if cnt > 1:
             text(out, (px + sz * 0.62, py + sz * 0.05), str(cnt), sz * 0.58, RGB[kid])
+    # the enemies and friendlies, sized as in game: a heavy's skull as big as a loot icon (11 cells), the dots 5.2 and
+    # 3.6 cells across; the dots first, the skulls on top
+    for x, y, kid, tier in sorted(foes, key=lambda f: f[3] == 3):
+        px, py = c + x * inner, c - y * inner
+        sz = int(h * {3: 1.0, 2: 5.2 / 11, 1: 3.6 / 11}[tier])
+        out.alpha_composite(icon(kid, sz), (int(px - sz / 2), int(py - sz / 2)))
     # me: the dotted heading line and the square, sonar green
     d = ImageDraw.Draw(out)
     s = max(2, r / 120)
@@ -133,18 +149,19 @@ def radar(r):
     return out, pad
 
 
-def ledger(scale):
+def ledger(scale, rows=None):
     """the ledger's tiles as drawn in game, `scale` px per game cell: each kind a small square with a line in its color
     along the top, its icon and how many are left; a cleared kind dims, with a gray line and a check mark"""
+    LEDGER = LEDGER_ROWS if rows is None else rows
     TW, TH, GAP, ROW, ISZ = 15 * scale, 17 * scale, 1.5 * scale, 3 * scale, 8.5 * scale
-    n = max(len(r) for r in LEDGER_ROWS)
+    n = max(len(r) for r in LEDGER)
     W = int(n * TW + (n - 1) * GAP + 4)
-    H = int(len(LEDGER_ROWS) * TH + (len(LEDGER_ROWS) - 1) * ROW + 4)
+    H = int(len(LEDGER) * TH + (len(LEDGER) - 1) * ROW + 4)
     img = Image.new('RGBA', (W, H), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
     f = ImageFont.truetype(FONT, int(5.6 * scale))
     line = max(2, int(scale * 0.9 + 0.5))
-    for ri, row in enumerate(LEDGER_ROWS):
+    for ri, row in enumerate(LEDGER):
         y0 = 2 + ri * (TH + ROW)
         x0 = W - 2 - len(row) * TW - (len(row) - 1) * GAP          # right-aligned beside the radar
         for kid, left in row:
@@ -166,13 +183,14 @@ def ledger(scale):
     return img
 
 
-def hero(W, H, cx, cy, r, show_ledger=True):
-    img = background(W, H)
-    rad, pad = radar(r)
+def hero(W, H, cx, cy, r, show_ledger=True, bg=None, sweep_at=SWEEP_AT, pickups=None, foes=None, rows=None):
+    """the scene; clip.py passes its own background (made once) and each frame's sweep, pickups, foes and ledger"""
+    img = background(W, H) if bg is None else bg.copy()
+    rad, pad = radar(r, sweep_at, pickups, foes)
     img.alpha_composite(rad, (int(cx - r - pad), int(cy - r - pad)))
     if show_ledger:
         s = r / 205 * 2.25 * 1.15        # as in game: 2.25 px a cell at radius 205 (a touch bigger here)
-        L = ledger(s)
+        L = ledger(s, rows)
         lx, ly = int(cx - r - 6 * s - L.width), int(cy + r - L.height)
         sh = Image.new('RGBA', L.size, (0, 0, 0, 0)); sh.putalpha(L.getchannel('A').point(lambda v: v // 2))
         img.alpha_composite(sh.filter(ImageFilter.GaussianBlur(4)), (lx + 3, ly + 4))
