@@ -3,3 +3,6 @@ src/out/
 __pycache__/
 *.pyc
 *.zip
+# game files (taken from your game or the release zip)
+src/pickup_icons/
+src/weapon_icons/

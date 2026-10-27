@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.7.0
+
+- New: **Enemies** (optional): enemies inside the radar's range as red dots (medium ones bigger), heavies with the
+  game's skull. Pick All, Medium and heavy, or Heavy only. A killed enemy drops off; for many kinds right as it dies,
+  and the radar learns more kinds' deaths as you play. Tank wrecks drop off too. Some enemies may linger on the radar
+  for about 10 seconds after they die (Fleshmobs, Devastators, Berserkers and Harvesters among them).
+- New: **SEAF Troopers and Civilians** (optional) as blue dots, and **Squadmates** (optional) as green dots, inside the
+  radar's range. Each drops off when it dies; your own Helldiver is the radar's middle, never a dot.
+- New: **Radar Position**: beside the map (as before), any corner, or mid height on either side. The options menu (F9)
+  also has sliders to move it a little from there, and the ledger moves to the radar's other side when the radar is on
+  the left.
+- New: pick which support weapons show, each with its own row in the options menu (F9).
+- Weapons SEAF troopers carry now count as carried, like a Helldiver's, instead of showing as lying on the ground.
+- World Markers can now also reach 5, 10 or 15 m.
+- The loot kinds now use the game's own icons.
+- Fixed: fabricators destroyed before you joined a mission stayed on the radar.
+- The options menu (F9) is reorganized: the look first, then what shows, then the keys, with the weapons last. The
+  options in your mod manager follow the same order.
+- A shorter log: treasure_radar.log keeps your settings, where the radar sits and one summary line per mission.
+
 ## 0.6.0
 
 - **Now runs on the standalone Chef Shared Loader (1.0.0 or newer), which has to be installed as its own mod.** Treasure
