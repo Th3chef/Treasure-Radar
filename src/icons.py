@@ -1,11 +1,33 @@
-"""Treasure Radar's pickup icons, drawn as vector shapes (copies of the game's own pickup icons, re-rendered cleanly).
-Each shape is laid out on a 36-unit-high grid (y down) and rendered at any height with 4x supersampling.
-mask(kind, height) -> 'L' image: 255 = the icon's body, 0 = empty (cut-outs show the map through)."""
+"""Treasure Radar's icon shapes. The loot kinds use the game's own icons (pickup_icons/<kind>.png, taken from the
+player's game with Filediver; they're game files, so they aren't in this repository). Without them, and for the enemy
+structures (the game has no icon for each), I draw vector shapes: laid out on a 36-unit-high grid (y down) and
+rendered at any height with 4x supersampling.
+mask(kind, height) -> 'L' image that fits a height x height box: 255 = the icon's body, 0 = empty (cut-outs show the
+map through)."""
 import math
-from PIL import Image, ImageDraw
+import os
+from PIL import Image, ImageChops, ImageDraw, ImageFilter
+
+# the game's icon for each loot kind (the texture each one is cut from, for re-exporting after a game update):
+# Super Credits, medal, requisition slip and the samples are the game's reward icons, the supplies their pickups' own
+# marker icons, and the stim pack the HUD's syringe
+GAME_ICONS = {'credit': '9414ab4f02745820', 'medal': '980cf7bb9ce23913', 'requisition': '89d9a4e1eddb5c0a',
+              'common': '5d9cd53cc1d3c44c', 'rare': '1ff270be2076cca6', 'super': '8d99a7a7ee0d21cc',
+              'ammo': '7615d6a35c657087', 'grenade': '4c3bef8bc16021c9', 'stim': '93b43ada76587340',
+              'enemy': '6a6598587d4bc8f5', 'enemydot': '932be8284447e469'}
+# how a shape is read from its icon when it isn't simply the alpha (or the darkest channel of a white-on-black one):
+# the skull has a dark rim baked into its alpha (only its light body is kept)
+READ = {'enemy': 'light'}
+PICKUP_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'pickup_icons')
+# kinds that share another's game icon in their own color: the SEAF troopers' blue dot is the enemy dot
+SAME = {'frienddot': 'enemydot', 'squaddot': 'enemydot'}
+# the reward icons for Super Credits and requisition slips have a bar under the square; I keep only the square
+DROP_BAR = ('credit', 'requisition')
+# the game's syringe lies flat and thin; tilted (needle up to the left) it fills the square like the other icons
+TILT = {'stim': -45}
 
 GRID = 36
-WIDTH = {'fabricator': 36, 'bulkfab': 36, 'ilship': 36, 'bughole': 36, 'titanhole': 36, 'objective': 36, 'ammo': 36, 'grenade': 32, 'stim': 36, 'medal': 26, 'common': 36, 'rare': 36, 'super': 36, 'credit': 36, 'requisition': 36}
+WIDTH = {'fabricator': 36, 'bulkfab': 36, 'ilship': 36, 'bughole': 36, 'titanhole': 36, 'ammo': 36, 'grenade': 32, 'stim': 36, 'medal': 26, 'common': 36, 'rare': 36, 'super': 36, 'credit': 36, 'requisition': 36, 'enemy': 30, 'enemydot': 36, 'frienddot': 36, 'squaddot': 36}
 
 
 def octagon(cx, cy, rx, ry):
@@ -156,17 +178,84 @@ def draw_titanhole(d):
     d.rectangle((8, 27, 28, 36), fill=0)
 
 
-def draw_objective(d):
-    # a side objective (not drawn on the radar yet): a diamond with an exclamation mark cut out
-    d.polygon([(18, 0), (36, 18), (18, 36), (0, 18)], fill=255)
-    d.polygon([(15.4, 7), (20.6, 7), (19.7, 21.5), (16.3, 21.5)], fill=0)
-    d.rectangle((15.6, 24.2, 20.4, 29), fill=0)
+def draw_enemydot(d):
+    ellipse(d, 18, 18, 18, 255)
 
 
-DRAW = {'titanhole': draw_titanhole, 'objective': draw_objective, 'bughole': draw_bughole, 'fabricator': draw_fabricator, 'bulkfab': draw_bulkfab, 'ilship': draw_ilship, 'ammo': draw_ammo, 'grenade': draw_grenade, 'stim': draw_stim, 'medal': draw_medal, 'common': draw_common, 'rare': draw_rare, 'super': draw_super, 'credit': draw_credit, 'requisition': draw_requisition}
+def draw_heavy(d):
+    # a plain skull (only without the game's icons)
+    d.polygon([(4, 2), (26, 2), (30, 8), (30, 22), (24, 26), (24, 34), (6, 34), (6, 26), (0, 22), (0, 8)], fill=255)
+    ellipse(d, 9, 15, 4, 0)
+    ellipse(d, 21, 15, 4, 0)
+    d.polygon([(15, 20), (18, 25), (12, 25)], fill=0)
+
+
+DRAW = {'enemy': draw_heavy, 'enemydot': draw_enemydot, 'frienddot': draw_enemydot, 'squaddot': draw_enemydot, 'titanhole': draw_titanhole, 'bughole': draw_bughole, 'fabricator': draw_fabricator, 'bulkfab': draw_bulkfab, 'ilship': draw_ilship, 'ammo': draw_ammo, 'grenade': draw_grenade, 'stim': draw_stim, 'medal': draw_medal, 'common': draw_common, 'rare': draw_rare, 'super': draw_super, 'credit': draw_credit, 'requisition': draw_requisition}
+
+
+def has_game_icons():
+    return all(os.path.exists(os.path.join(PICKUP_DIR, k + '.png')) for k in GAME_ICONS)
+
+
+_shapes = {}
+
+
+def game_shape(kind):
+    """the game's icon for a loot kind as an 'L' mask cropped to the shape, or None when pickup_icons/ doesn't have it"""
+    kind = SAME.get(kind, kind)
+    if kind in _shapes:
+        return _shapes[kind]
+    p = os.path.join(PICKUP_DIR, kind + '.png')
+    if kind not in GAME_ICONS or not os.path.exists(p):
+        _shapes[kind] = None
+        return None
+    im = Image.open(p).convert('RGBA')
+    r, g, b, a = im.split()
+    if READ.get(kind) == 'max':
+        m = ImageChops.lighter(ImageChops.lighter(r, g), b)
+    elif READ.get(kind) == 'light':
+        m = ImageChops.multiply(a, ImageChops.darker(ImageChops.darker(r, g), b).point(lambda v: 0 if v < 120 else 255))
+    elif a.getextrema()[0] < 250:
+        m = a                                        # a shape on a transparent background
+    else:
+        # white on black with a blue glow: the darkest channel keeps the white body and drops the glow
+        m = ImageChops.darker(ImageChops.darker(r, g), b).point(lambda v: 0 if v < 48 else min(255, round((v - 48) * 255 / 160)))
+    if kind in DROP_BAR:
+        # rows from the bottom up: the bar, then an empty gap, then the square; I cut at the gap
+        w, h = m.size
+        px = m.load()
+        filled = [any(px[x, y] > 128 for x in range(w)) for y in range(h)]
+        y = h - 1
+        while y > 0 and not filled[y]: y -= 1
+        while y > 0 and filled[y]: y -= 1
+        if y > h // 2:
+            m = m.crop((0, 0, w, y))
+    box = m.point(lambda v: 255 if v > 24 else 0).getbbox()
+    m = m.crop(box) if box else m
+    if kind in TILT:
+        m = m.resize((m.width * 4, m.height * 4), Image.BICUBIC).rotate(TILT[kind], Image.BICUBIC, expand=True)
+        m = m.crop(m.point(lambda v: 255 if v > 24 else 0).getbbox())
+    _shapes[kind] = m
+    return m
+
+
+def _fit(shape, height):
+    """the shape scaled to fit a height x height box; when it grows, its edges are sharpened back afterwards"""
+    w, h = shape.size
+    k = height / max(w, h)
+    size = (max(1, round(w * k)), max(1, round(h * k)))
+    out = shape.resize(size, Image.BICUBIC if k > 1 else Image.LANCZOS)
+    if k > 1.5:
+        # a small source's pixel steps show when it grows a lot: I soften them first, then sharpen the edge
+        out = out.filter(ImageFilter.GaussianBlur(k * 0.35)) if k > 3 else out
+        out = out.point(lambda v: 0 if v < 64 else (255 if v > 191 else round((v - 64) * 255 / 127)))
+    return out
 
 
 def mask(kind, height):
+    shape = game_shape(kind)
+    if shape is not None:
+        return _fit(shape, height)
     ss = 4
     scale = height * ss / GRID
     w = WIDTH[kind]
@@ -186,4 +275,7 @@ def mask(kind, height):
 
 
 def aspect(kind):
+    shape = game_shape(kind)
+    if shape is not None:
+        return shape.width / shape.height
     return WIDTH[kind] / GRID

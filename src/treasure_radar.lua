@@ -1,8 +1,10 @@
 -- HD2-Addon: mods/chef/treasure_radar
 -- Treasure Radar, a Chef Shared Loader addon.
 -- A round sonar radar just left of where the game's map opens (bottom right), with an icon for every pickup around me,
--- a ledger of tiles counting what's left of each kind, and markers floating over the pickups near me. Weapons on the
--- ground (optional) show with their own silhouettes, outside the ledger.
+-- a ledger of tiles counting what's left of each kind, and markers floating over the pickups near me. Optional: weapons
+-- on the ground (each with its own silhouette, picked one by one in the options menu), enemy structures, and on the
+-- radar only, inside its range: enemies (all, medium and heavy, or heavy only), SEAF troopers and civilians, and my
+-- squadmates.
 -- The settings are Arsenal options, and can be changed in game in the loader's options menu (F9).
 -- How: the loader lists my kinds' units every 3 s (spread over frames) and I draw everything with its screen drawing.
 -- Nothing Lua can read says the map is open, so the radar sits beside it, level with it, where neither covers the
@@ -12,7 +14,7 @@
 local chef = ...
 -- my log is treasure_radar.log next to the loader's; a loader without own_log keeps my lines in chef_loader.log
 if type(chef.own_log) == 'function' then chef.own_log('treasure_radar') end
-local M = { version = '0.6.0' }
+local M = { version = '0.7.0' }
 local floor, sqrt, max, min, atan2, exp, pi = math.floor, math.sqrt, math.max, math.min, math.atan2, math.exp, math.pi
 
 -- Fallback icons, 9 x 9 (X = the kind's color, o = dark outline, . = empty), for when the textures can't be used.
@@ -31,13 +33,14 @@ local ICON = {
   bfab = { '......o.o', '......XoX', 'o.o.o.XoX', 'XoXoXoXoX', 'XXXXXXXXX', 'XXXXXXXXX', 'XXoooooXX', 'XXo...oXX', 'ooooooooo' },
   ship = { '.........', '...ooo...', '..oXXXo..', '.oXXXXXo.', 'oXXXXXXXo', 'oooooooo.', '.X..X..X.', '.X..X..X.', '.........' },
   hole = { '.........', '..ooooo..', '.oXXXXXo.', 'oXXoooXXo', 'oXo...oXo', 'oXo...oXo', 'oXo...oXo', 'ooooooooo', '.........' },
+  skull = { '.ooooooo.', 'oXXXXXXXo', 'oXXXXXXXo', 'oXoXXXoXo', 'oXoXXXoXo', 'oXXXoXXXo', '.oXXXXXo.', '.oXoXoXo.', '.ooooooo.' },
 }
 local CHECK = { '........X', '.......XX', '......XX.', 'X....XX..', 'XX..XX...', '.XXXX....', '..XX.....', '.........', '.........' }
 
 -- The kinds, in ledger order (the most valuable first, supplies last), with their units' resource ids. Pickups of a
 -- kind within `stack` meters of each other share one icon on the radar, with a count.
--- An enemy structure is here only when I know how a destroyed one looks, so it drops off then. Side objectives and
--- Bile Titan holes aren't: nothing readable changes on them, so they would stay on the radar all mission.
+-- An enemy structure drops off once it looks destroyed (its meshes or its animation state, per kind below). Bile Titan
+-- holes aren't here: a closed one showed no change I can read.
 local KINDS = {
   { id = 'credit', icon = 'coin', rgb = { 115, 233, 242 }, stack = 2, units = { 'bd6f4de16b9aedcd' } },
   { id = 'medal', icon = 'star', rgb = { 255, 221, 31 }, stack = 2, units = { '773c4184e4bad0df' } },
@@ -52,9 +55,10 @@ local KINDS = {
   { id = 'ammo', icon = 'ammo', rgb = { 255, 234, 128 }, stack = 10, supply = true, units = { '79ccffd281e3f3a9' } },
   { id = 'grenade', icon = 'grenade', rgb = { 135, 170, 45 }, stack = 10, supply = true, units = { '97af34fbf093409c' } },
   { id = 'stim', icon = 'cross', rgb = { 60, 140, 255 }, stack = 10, supply = true, units = { 'b4ca4c5b922f7965' } },
-  -- Enemy Structures, in deep red. A destroyed bot fabricator stays in the world, but its animation state goes to 3
-  -- (`dead_state`).
-  { id = 'fabricator', say = 'fabricator', icon = 'fab', rgb = { 190, 20, 30 }, stack = 5, structure = true, dead_state = 3, units = { 'a57ae2a703c02899' } },
+  -- Enemy Structures, in deep red. A destroyed bot fabricator stays in the world: its animation state goes to 3, then
+  -- 4, and its 21 meshes swap from whole (1-4 and 17-21 show) to rubble (12-16 show). One destroyed before I joined
+  -- arrives as rubble but its state never moves, so the hidden first mesh counts too (`dead_mesh`).
+  { id = 'fabricator', say = 'fabricator', icon = 'fab', rgb = { 190, 20, 30 }, stack = 5, structure = true, dead_state = 3, dead_mesh = 1, units = { 'a57ae2a703c02899' } },
   -- The Bulk Fabricator (colony_cyborg_spawner). Its state stays 0 when destroyed, but its meshes swap: whole, meshes
   -- 1-3 and 17-20 show; destroyed, 1-3 hide and the rubble (4-16) shows. So it's destroyed once mesh 1 hides.
   { id = 'bulkfab', say = 'Bulk Fabricator', icon = 'bfab', rgb = { 190, 20, 30 }, stack = 8, structure = true, dead_mesh = 1, units = { 'a2a86454f67fbc47' } },
@@ -73,7 +77,94 @@ local KINDS = {
               '02eecd0b1fa49630', '88c2d09ad85a7c9f', 'fe3b29b2cfa63f9b', '9f80d67a12a7e40f', 'd54b9505c0f72873',
               '35a61296619cc47e', '43a58cb89cfa197c', 'a6a735accb4a327f', '2152d5147b0ac418', '11c27d3babb38956',
               'b16c9d490aa59b77', '5990123d142b16cb', 'e8d5f49ad7780e54', '26e40437ea275296', '2e9d0bdc48b09e60',
-              '3828e2051aa9e897', 'cc786f6491fe7e65', '43b2d7766120203b', '52071f49263415e4' } },
+              '3828e2051aa9e897', 'cc786f6491fe7e65', '43b2d7766120203b', '52071f49263415e4' },
+    -- each weapon's name, for its row in the options menu (the player picks which weapons show)
+    names = { ['6cfcc7f8801a0266'] = '40-K Meltagun', ['a8cffb316f0b5c5f'] = 'AC-8 Autocannon', ['89c5493e08ca4207'] = 'APW-1 Anti-Materiel Rifle',
+      ['96de9cd50f7306e6'] = 'ARC-3 Arc Thrower', ['78a8185f63a70795'] = 'B/FLAM-80 Cremator', ['80932fa0ed6901d3'] = 'EAT-17 Expendable Anti-Tank',
+      ['7617642765ac38c7'] = 'EAT-411 Leveller', ['b2b5e0d185605f9e'] = 'EAT-700 Expendable Napalm', ['25aa2fd4643cf4ee'] = 'FAF-14 Spear',
+      ['39ab99895147a3bf'] = 'FLAM-40 Flamethrower', ['02eecd0b1fa49630'] = 'GL-21 Grenade Launcher', ['88c2d09ad85a7c9f'] = 'GL-28 Belt-Fed Grenade Launcher',
+      ['fe3b29b2cfa63f9b'] = 'GL-52 De-Escalator', ['9f80d67a12a7e40f'] = 'GR-8 Recoilless Rifle', ['d54b9505c0f72873'] = 'LAS-98 Laser Cannon',
+      ['35a61296619cc47e'] = 'LAS-99 Quasar Cannon', ['43a58cb89cfa197c'] = 'M-1000 Maxigun', ['a6a735accb4a327f'] = 'M-105 Stalwart',
+      ['2152d5147b0ac418'] = 'MG-206 Heavy Machine Gun', ['11c27d3babb38956'] = 'MG-43 Machine Gun', ['b16c9d490aa59b77'] = 'MGX-42 Bullet Storm',
+      ['5990123d142b16cb'] = 'MLS-4X Commando', ['e8d5f49ad7780e54'] = 'PLAS-45 Epoch', ['26e40437ea275296'] = 'RL-77 Airburst Rocket Launcher',
+      ['2e9d0bdc48b09e60'] = 'RS-422 Railgun', ['3828e2051aa9e897'] = 'S-11 Speargun', ['cc786f6491fe7e65'] = 'StA-X3 W.A.S.P. Launcher',
+      ['43b2d7766120203b'] = 'TX-41 Sterilizer', ['52071f49263415e4'] = 'SG-88 Break-Action Shotgun' } },
+  -- Enemies, in bright red, only inside the radar's range and never in the ledger or as world markers: the heavies
+  -- with the game's skull, the rest as the game's enemy dot (medium ones bigger). Each one's main body unit (its guns,
+  -- arms, turrets, legs and packs are units of their own and left out, so nothing counts twice). Gun emplacements are
+  -- left out too (harmless until an enemy mans one); the bunker turret fires on its own, so it's in. The Enemies option
+  -- picks how many tiers show (`tier`: 3 heavy, 2 medium, 1 light); a tier not shown isn't listed at all. They move,
+  -- so I keep reading where they are while the radar shows (see foe_update), not only at each list.
+  { id = 'enemy', say = 'enemy', icon = 'skull', rgb = { 255, 70, 50 }, stack = 0, enemy = true,
+    units = {
+              '1a7fcdff98c664b0', '3aff5fd7d5450b99', '6b202392f4ab605e', '0ab7b92b131c228c', 'dcf8e74212fbee3b',
+              '9e2e17f2ccccafdd', 'ef04cb84d097a497', '960b48a421a3faaa', 'd465d9c7f77a07cb', '36aa99cce5e60146',
+              'ccae5264acd591b7', 'cc7022fdd172089b', 'a381a11c07d3eb94', 'd522fd4748d443a5', 'f79cd8bb654397df',
+              'a1f37bf2a40fbde4', 'f540ca9d9d4a422e', 'a35207c6f2150806', '09872e66d1276e1f', 'be39e313a1e46bb9',
+              '10081acef6163ef6', '1baeef36a88ae579', 'a478d36a62a861f4', 'd7e2c78b1ef4a8e1', 'c28b3482e73d1ea9',
+              'aab438596f5e8fd9', 'c14e0e887e7d2106', '5b968cd78f8bc7a0', 'db964631be1cf501', '72a83e49ced6db3d',
+              '64090088502435dd', '846bc06c6b213a06', 'b16493b009eec762', '00bcf8247a544cdc', 'd37e8d120d2836e3',
+              'ef570293245a17c2', 'bc242702fb46b7e7', 'ae63e525853d7044', 'c626d2bb495a202d', 'db7139323c40ae6f',
+              '3d9c95bd03c0c7cf', 'a6a68d8af177f3a1', '54e107dacf6929cb', 'f8131632aa867107', '282eb766c1ffa6a1',
+              'db90077e76faa025', 'b2b3056bdf28e57b', '64ba5f030b114ec1', '9821303bd499cd62', '9f57782f00e6ed20',
+              'a71aafd82c6ebc92', '746a7f3beda32699', '1338b552afe68f0a', '9f44121c554dae89', '67381f685e9b69a8',
+              '965eae5a51acdd4a', '453fe22c634eb30f', 'f22d027b37bef107', 'da40bb347c7447f2', '604a794ec45bb820',
+              'e8f19a0aa958e46d', '905809a4c28d8a45', 'cc188f0c80505c6c', '20b9c7734daead65', 'ac60e78435098c9d',
+              '67dc32dca4f02d33', '19e18b46ec55d94a', '74e2285c01da4f71', '78e1497571012c47', '0adc9f9173ad8e1d',
+              '44458a2c52b002fb', '34dfd23365472e9e', 'f735a51a991e4bda', '9926876b2375a1bb' },
+    names = {
+      ['1a7fcdff98c664b0'] = 'Charger', ['3aff5fd7d5450b99'] = 'Charger Behemoth', ['6b202392f4ab605e'] = 'Spore Charger',
+      ['0ab7b92b131c228c'] = 'Rupture Charger', ['dcf8e74212fbee3b'] = 'Impaler', ['9e2e17f2ccccafdd'] = 'Bile Titan',
+      ['ef04cb84d097a497'] = 'Spore Burst Bile Titan', ['960b48a421a3faaa'] = 'Dragonroach', ['d465d9c7f77a07cb'] = 'Hive Lord',
+      ['36aa99cce5e60146'] = 'Bile Spewer', ['ccae5264acd591b7'] = 'Bile Spewer', ['cc7022fdd172089b'] = 'Nursing Spewer',
+      ['a381a11c07d3eb94'] = 'Rupture Spewer', ['d522fd4748d443a5'] = 'Brood Commander', ['f79cd8bb654397df'] = 'Alpha Commander',
+      ['a1f37bf2a40fbde4'] = 'Hive Guard', ['f540ca9d9d4a422e'] = 'Stalker', ['a35207c6f2150806'] = 'Rupture Warrior',
+      ['09872e66d1276e1f'] = 'Warrior', ['be39e313a1e46bb9'] = 'Warrior', ['10081acef6163ef6'] = 'Bile Warrior',
+      ['1baeef36a88ae579'] = 'Spore Burst Warrior', ['a478d36a62a861f4'] = 'Hunter', ['d7e2c78b1ef4a8e1'] = 'Predator Hunter',
+      ['c28b3482e73d1ea9'] = 'Spore Burst Hunter', ['aab438596f5e8fd9'] = 'Pouncer', ['c14e0e887e7d2106'] = 'Scavenger',
+      ['5b968cd78f8bc7a0'] = 'Scavenger', ['db964631be1cf501'] = 'Spore Burst Scavenger', ['72a83e49ced6db3d'] = 'Bile Spitter',
+      ['64090088502435dd'] = 'Shrieker', ['846bc06c6b213a06'] = 'Hulk', ['b16493b009eec762'] = 'Hulk Scorcher',
+      ['00bcf8247a544cdc'] = 'Tank', ['d37e8d120d2836e3'] = 'Factory Strider', ['ef570293245a17c2'] = 'War Strider',
+      ['bc242702fb46b7e7'] = 'Vox Engine', ['ae63e525853d7044'] = 'Devastator', ['c626d2bb495a202d'] = 'Devastator',
+      ['db7139323c40ae6f'] = 'Rocket Devastator', ['3d9c95bd03c0c7cf'] = 'Heavy Devastator', ['a6a68d8af177f3a1'] = 'Berserker',
+      ['54e107dacf6929cb'] = 'Berserker', ['f8131632aa867107'] = 'Scout Strider', ['282eb766c1ffa6a1'] = 'Gunship',
+      ['db90077e76faa025'] = 'Dropship', ['b2b3056bdf28e57b'] = 'Trooper', ['64ba5f030b114ec1'] = 'Marauder',
+      ['9821303bd499cd62'] = 'Trooper', ['9f57782f00e6ed20'] = 'Trooper', ['a71aafd82c6ebc92'] = 'Commissar',
+      ['746a7f3beda32699'] = 'Radical', ['1338b552afe68f0a'] = 'Radical', ['9f44121c554dae89'] = 'Agitator',
+      ['67381f685e9b69a8'] = 'Agitator', ['965eae5a51acdd4a'] = 'Harvester', ['453fe22c634eb30f'] = 'Gatekeeper',
+      ['f22d027b37bef107'] = 'Leviathan', ['da40bb347c7447f2'] = 'Overseer', ['604a794ec45bb820'] = 'Elevated Overseer',
+      ['e8f19a0aa958e46d'] = 'Crescent Overseer', ['905809a4c28d8a45'] = 'Crusher', ['cc188f0c80505c6c'] = 'Wretch',
+      ['20b9c7734daead65'] = 'Veracitor', ['ac60e78435098c9d'] = 'Watcher', ['67dc32dca4f02d33'] = 'Fleshmob',
+      ['19e18b46ec55d94a'] = 'Stingray', ['74e2285c01da4f71'] = 'Warp Ship', ['78e1497571012c47'] = 'Voteless',
+      ['0adc9f9173ad8e1d'] = 'Voteless', ['44458a2c52b002fb'] = 'Voteless', ['34dfd23365472e9e'] = 'Obtruder',
+      ['f735a51a991e4bda'] = 'Warp Ship', ['9926876b2375a1bb'] = 'Bunker Turret' },
+    tier = {
+      ['1a7fcdff98c664b0'] = 3, ['3aff5fd7d5450b99'] = 3, ['6b202392f4ab605e'] = 3, ['0ab7b92b131c228c'] = 3, ['dcf8e74212fbee3b'] = 3,
+      ['9e2e17f2ccccafdd'] = 3, ['ef04cb84d097a497'] = 3, ['960b48a421a3faaa'] = 3, ['d465d9c7f77a07cb'] = 3, ['36aa99cce5e60146'] = 2,
+      ['ccae5264acd591b7'] = 2, ['cc7022fdd172089b'] = 2, ['a381a11c07d3eb94'] = 2, ['d522fd4748d443a5'] = 2, ['f79cd8bb654397df'] = 2,
+      ['a1f37bf2a40fbde4'] = 2, ['f540ca9d9d4a422e'] = 2, ['a35207c6f2150806'] = 2, ['09872e66d1276e1f'] = 1, ['be39e313a1e46bb9'] = 1,
+      ['10081acef6163ef6'] = 1, ['1baeef36a88ae579'] = 1, ['a478d36a62a861f4'] = 1, ['d7e2c78b1ef4a8e1'] = 1, ['c28b3482e73d1ea9'] = 1,
+      ['aab438596f5e8fd9'] = 1, ['c14e0e887e7d2106'] = 1, ['5b968cd78f8bc7a0'] = 1, ['db964631be1cf501'] = 1, ['72a83e49ced6db3d'] = 1,
+      ['64090088502435dd'] = 1, ['846bc06c6b213a06'] = 3, ['b16493b009eec762'] = 3, ['00bcf8247a544cdc'] = 3, ['d37e8d120d2836e3'] = 3,
+      ['ef570293245a17c2'] = 3, ['bc242702fb46b7e7'] = 3, ['ae63e525853d7044'] = 2, ['c626d2bb495a202d'] = 2, ['db7139323c40ae6f'] = 2,
+      ['3d9c95bd03c0c7cf'] = 2, ['a6a68d8af177f3a1'] = 2, ['54e107dacf6929cb'] = 2, ['f8131632aa867107'] = 2, ['282eb766c1ffa6a1'] = 2,
+      ['db90077e76faa025'] = 2, ['b2b3056bdf28e57b'] = 1, ['64ba5f030b114ec1'] = 1, ['9821303bd499cd62'] = 1, ['9f57782f00e6ed20'] = 1,
+      ['a71aafd82c6ebc92'] = 1, ['746a7f3beda32699'] = 1, ['1338b552afe68f0a'] = 1, ['9f44121c554dae89'] = 1, ['67381f685e9b69a8'] = 1,
+      ['965eae5a51acdd4a'] = 3, ['453fe22c634eb30f'] = 3, ['f22d027b37bef107'] = 3, ['da40bb347c7447f2'] = 2, ['604a794ec45bb820'] = 2,
+      ['e8f19a0aa958e46d'] = 2, ['905809a4c28d8a45'] = 2, ['cc188f0c80505c6c'] = 2, ['20b9c7734daead65'] = 2, ['ac60e78435098c9d'] = 2,
+      ['67dc32dca4f02d33'] = 3, ['19e18b46ec55d94a'] = 2, ['74e2285c01da4f71'] = 2, ['78e1497571012c47'] = 1, ['0adc9f9173ad8e1d'] = 1,
+      ['44458a2c52b002fb'] = 1, ['34dfd23365472e9e'] = 1, ['f735a51a991e4bda'] = 2, ['9926876b2375a1bb'] = 2 } },
+  -- Friendlies: SEAF troopers (both kinds) and civilians (an evacuation's), as blue dots inside the radar's range,
+  -- tracked like the enemies (they move, and a body loses its state machine, so one drops off when it dies).
+  { id = 'friend', say = 'SEAF trooper', icon = 'skull', rgb = { 80, 170, 255 }, stack = 0, enemy = true, friendly = true, dot = 'frienddot',
+    units = { '7a3637cd33a54e4c', '75f7e96af7dcd303', 'b08f09d64e228427', 'e71dbcb6a50f321b' },
+    names = { ['7a3637cd33a54e4c'] = 'SEAF trooper', ['75f7e96af7dcd303'] = 'SEAF trooper', ['b08f09d64e228427'] = 'civilian',
+      ['e71dbcb6a50f321b'] = 'civilian' },
+    tier = { ['7a3637cd33a54e4c'] = 2, ['75f7e96af7dcd303'] = 2, ['b08f09d64e228427'] = 2, ['e71dbcb6a50f321b'] = 2 } },
+  -- Squadmates: the other Helldivers, as green dots inside the radar's range (not me: I'm the radar's middle). One who
+  -- dies drops off; reinforced, he's a new unit and shows again.
+  { id = 'squad', say = 'Helldiver', icon = 'skull', rgb = { 60, 230, 120 }, stack = 0, enemy = true, friendly = true, dot = 'squaddot',
+    units = { '4d1c334d294dfa97' }, names = { ['4d1c334d294dfa97'] = 'Helldiver' }, tier = { ['4d1c334d294dfa97'] = 2 } },
 }
 -- A Helldiver (any player). A weapon held or on someone's back sits up at their hands or back, a dropped one on the
 -- ground (also next to a body), so a weapon near a carrier and CARRY_UP above their feet is carried, not shown.
@@ -82,10 +173,10 @@ local DIVER = '4d1c334d294dfa97'
 -- troopers (cha_seaf, cha_battlefront_seaf: their specialists carry EATs and machine guns).
 local CARRIERS = { [DIVER] = true, ['d0cf4d493ca08bed'] = true, ['7a3637cd33a54e4c'] = true, ['75f7e96af7dcd303'] = true }
 local CARRY_NEAR, CARRY_UP_MIN, CARRY_UP_MAX = 1.2, 0.5, 2.3
--- A trooper's weapon can sit 0.4-1.9 m from him and -0.7 to 0.4 m up from his position. So near a carrier, in this
--- wider reach, a weapon only counts as lying on the ground once it has stayed put from one list to the next: a
--- trooper's weapon moves with him, one dropped by a body doesn't.
-local NEAR_REACH, NEAR_DOWN, NEAR_UP, STILL_M = 2.5, -1.5, 2.5, 0.3
+-- A trooper's weapon can sit 0.4-1.9 m from him and -0.7 to 0.4 m up from his position. So in this wider reach of a
+-- living carrier (one with an animation state machine: a body loses it) a weapon counts as carried, still or not; in
+-- that reach of a body it's lying on the ground (a fallen Helldiver's or trooper's).
+local NEAR_REACH, NEAR_DOWN, NEAR_UP = 2.5, -1.5, 2.5
 -- My textures (resource ids, filled in by the build): the icons, the radar panel, the sweep's frames, the ledger's
 -- tile, the check mark, the blip glow, and the characters for numbers at six sizes.
 local TEXTURES = { weapons = {} }       -- weapons: unit id -> its silhouette (128 x 48); weapon_generic for the rest
@@ -97,7 +188,11 @@ local TEXTURE_SIZES = {}
 --@@ICON_TEXTURES@@
 if chef.ui_textures then chef.ui_textures(TEXTURES_UI) end
 if chef.texture_sizes then chef.texture_sizes(TEXTURE_SIZES) end
-for i, k in ipairs(KINDS) do k.texture = TEXTURES[k.id]; k.rank = i end
+for i, k in ipairs(KINDS) do
+  k.texture = TEXTURES[k.id]; k.rank = i
+  k.dot_tex = TEXTURES[k.dot or 'enemydot']       -- the small dot, in its own color (the tint is white)
+  if k.enemy and not k.friendly then M.foe_kind = k elseif k.weapon then M.weapon_kind = k end
+end
 local WEAPON_ASPECT = 128 / 48
 
 -- ------------------------------------------------------------------ options (Arsenal)
@@ -120,7 +215,12 @@ local STILL = any_options and opt.animation ~= true
 -- loader's options menu (F9; saved between launches). Everything below reads cfg, so a change shows at once. One
 -- table rather than a local each also keeps the drawing functions under Lua 5.1's 60 upvalues.
 local cfg = { radar = SHOW_RADAR, ledger = SHOW_LEDGER, scale = MAP_SCALE, rotate = ROTATE, markers = MARKERS,
-              opacity = OPACITY, still = STILL, kinds = {} }
+              opacity = OPACITY, still = STILL, kinds = {}, weapons_off = {},
+              -- Enemies: the lowest tier shown (1 all, 2 medium and heavy, 3 heavy only)
+              enemy_tier = max(1, min(3, tonumber(opt.enemy_tier) or 1)),
+              -- Position: where the radar sits (beside the game's map by default), and the player's nudge from there in
+              -- steps of half a percent of the screen's height
+              pos = opt.position or 'map', nudge_x = 0, nudge_y = 0 }
 for _, k in ipairs(KINDS) do cfg.kinds[k.id] = kind_on(k.id) end
 local ENDLESS = 10000                   -- World Markers at this range or more: no limit
 local function A(a) return floor(a * cfg.opacity + 0.5) end
@@ -280,6 +380,33 @@ local function read_hud()
     (hud.map_position == 0 or hud.map_position == nil) and '' or ' (this map position is not measured: the radar may sit a little off the map)')
 end
 
+-- Where the radar's center goes (screen pixels from the bottom left), and whether the ledger goes on its right (when
+-- the radar sits on the left). 'map': beside the game's map, not under it: left of the map's rim by MAP_GAP, its
+-- center level with the map's. The others sit in a corner or at mid height on either side, POS_MARGIN screen heights
+-- in from the HUD's own edges (HUD Edge Offset, as the game's HUD), then the player's nudge on top.
+local POS_MARGIN = 0.035
+function M.place(w, h, R)
+  local cx, cy
+  local left = false
+  if cfg.pos == 'map' or not cfg.pos then
+    cx, cy = M.layout(w, h)
+    cx = cx - MAP_RIM * h - MAP_GAP * h - R
+  else
+    local area = min(w, h * 16 / 9)
+    local off = hud.offset
+    if type(off) ~= 'number' or off < 0 or off > 1 then off = 1 end
+    local edge = off * (w - area) / 2 + POS_MARGIN * h
+    local side, row = cfg.pos:sub(1, 1), cfg.pos:sub(2, 2)     -- 'tl' = top left, 'mr' = middle right ...
+    left = row == 'l'
+    cx = left and edge + R or w - edge - R
+    cy = (side == 't' and h - POS_MARGIN * h - R) or (side == 'b' and POS_MARGIN * h + R) or h / 2
+  end
+  -- the sliders move it from there in steps of half a percent of the screen height, but never past an edge
+  cx = max(R, min(w - R, cx + cfg.nudge_x * 0.005 * h))
+  cy = max(R, min(h - R, cy + cfg.nudge_y * 0.005 * h))
+  return cx, cy, left
+end
+
 -- the map's center on screen (pixels, bottom-left origin)
 local function layout(w, h)
   local area = min(w, h * 16 / 9)
@@ -289,6 +416,7 @@ local function layout(w, h)
   local right = w - off * (w - area) / 2 - CORNER_RIGHT * h
   return right - (MAP_DX + ds * DX_PER_SCALE) * h, CORNER_BOTTOM * h + (MAP_DY + ds * DY_PER_SCALE) * h
 end
+M.layout = layout
 
 -- ------------------------------------------------------------------ the pickups
 local kind_of_unit, watch_kinds, active = {}, {}, {}
@@ -302,9 +430,15 @@ local function apply_kinds()
   WEAPONS_ON = false
   for _, k in ipairs(KINDS) do
     if cfg.kinds[k.id] then
-      active[#active + 1] = k
-      for _, u in ipairs(k.units) do kind_of_unit[u] = k; watch_kinds[u] = true end
-      if k.weapon then WEAPONS_ON = true end
+      local n = 0
+      for _, u in ipairs(k.units) do
+        -- a weapon the player switched off in the options menu, or an enemy below the tier shown, isn't listed at all
+        if not (k.weapon and cfg.weapons_off[u]) and not (k.enemy and not k.friendly and k.tier[u] < cfg.enemy_tier) then kind_of_unit[u] = k; watch_kinds[u] = true; n = n + 1 end
+      end
+      if n > 0 then
+        active[#active + 1] = k
+        if k.weapon then WEAPONS_ON = true end
+      end
     end
   end
   -- with Weapons on, the Helldivers are listed too (only to tell a carried weapon from a dropped one)
@@ -312,11 +446,11 @@ local function apply_kinds()
 end
 apply_kinds()
 -- Every loot kind, ticked or not, tells the loader a small mission from the ship (which never has loot). Supplies,
--- weapons and structures don't count: the ship might have them.
+-- weapons, structures and enemies don't count: the ship might have them.
 if chef.mission_kinds then
   local loot = {}
   for _, k in ipairs(KINDS) do
-    if not k.supply and not k.weapon and not k.structure then for _, u in ipairs(k.units) do loot[u] = true end end
+    if not k.supply and not k.weapon and not k.structure and not k.enemy then for _, u in ipairs(k.units) do loot[u] = true end end
   end
   chef.mission_kinds(loot)
 end
@@ -347,6 +481,15 @@ do
     toggle('radar', 'Show radar', cfg.radar, function(v) cfg.radar = v end)
     toggle('ledger', 'Show ledger', cfg.ledger, function(v) cfg.ledger = v end)
     choice('size', 'Size', { 'Small', 'Medium', 'Large' }, { 0.6, 0.75, 1.0 }, cfg.scale, function(v) cfg.scale = v end)
+    choice('position', 'Position', { 'Beside the map', 'Top left', 'Top right', 'Middle left', 'Middle right', 'Bottom left',
+      'Bottom right' }, { 'map', 'tl', 'tr', 'ml', 'mr', 'bl', 'br' }, cfg.pos, function(v) cfg.pos = v end)
+    local function nudge(id, label, field)
+      local v = chef.option(id, { type = 'slider', label = label, min = -60, max = 60, step = 1, default = 0 })
+      if type(v) == 'number' then cfg[field] = v end
+      chef.on_change(id, function(x) cfg[field] = x; said(label, x) end)
+    end
+    nudge('nudge_x', 'Move sideways', 'nudge_x')
+    nudge('nudge_y', 'Move up or down', 'nudge_y')
     local rnames, rvals = {}, {}
     for i, z in ipairs(ZOOMS) do rnames[i], rvals[i] = z .. ' M', z end
     choice('range', 'Range', rnames, rvals, range_now, function(v) if v ~= range_now then set_range(v) end end)
@@ -362,9 +505,46 @@ do
     if type(op) == 'number' then cfg.opacity = op / 100 end
     chef.on_change('opacity', function(x) cfg.opacity = x / 100; said('opacity', x) end)
     toggle('animation', 'Radar animation', not cfg.still, function(v) cfg.still = not v end)
-    choice('markers', 'World markers', { 'Off', '25 M', '50 M', '100 M', '200 M', 'Endless' },
-      { false, 25, 50, 100, 200, ENDLESS * 10 }, cfg.markers or false, function(v) cfg.markers = v or nil end)
+    -- (a choice is saved by its place in the list, so this row's values never change order)
+    choice('world_markers', 'World markers', { 'Off', '5 M', '10 M', '15 M', '25 M', '50 M', '100 M', '200 M', 'Endless' },
+      { false, 5, 10, 15, 25, 50, 100, 200, ENDLESS * 10 }, cfg.markers or false, function(v) cfg.markers = v or nil end)
     toggle('tab', 'Double-tap Tab to hide', cfg.tab, function(v) cfg.tab = v end)
+    -- The rows in groups, top to bottom (the menu has rows only, no headings): the look (above), then what shows (loot
+    -- in ledger order, supplies, enemy structures, enemies, friendlies), then the keys, and the weapons last, as they
+    -- bring a row for every weapon. Arsenal lists its options in the same order.
+    local NAMES = { credit = 'Super Credits', medal = 'Medals', common = 'Common Samples', rare = 'Rare Samples',
+      super = 'Super Samples', requisition = 'Requisition Slips', ammo = 'Ammo Boxes', grenade = 'Grenade Packs',
+      stim = 'Stim Packs', fabricator = 'Fabricators', bulkfab = 'Bulk Fabricators', ilship = 'Warp Ships',
+      bughole = 'Bug Holes', weapon = 'Weapons', enemy = 'Enemies', friend = 'SEAF Troopers and Civilians', squad = 'Squadmates' }
+    local ORDER = { 'credit', 'medal', 'requisition', 'common', 'rare', 'super', 'ammo', 'grenade', 'stim',
+      'fabricator', 'bulkfab', 'ilship', 'bughole', 'enemy', 'friend', 'squad' }
+    local by_id = {}
+    for _, k in ipairs(KINDS) do by_id[k.id] = k end
+    local function kind_row(k)
+      toggle('kind_' .. k.id, 'Show ' .. (NAMES[k.id] or k.id), cfg.kinds[k.id], function(v)
+        if cfg.kinds[k.id] ~= v then
+          cfg.kinds[k.id] = v
+          apply_kinds()
+          if watch then watch.refresh() end
+        end
+      end)
+    end
+    for _, id in ipairs(ORDER) do
+      local k = by_id[id]
+      if k then
+        kind_row(k)
+        -- right under Show Enemies: which tiers
+        if k.enemy and not k.friendly then
+          choice('enemy_tier', 'Enemies shown', { 'All', 'Medium and heavy', 'Heavy only' }, { 1, 2, 3 }, cfg.enemy_tier, function(v)
+            if cfg.enemy_tier ~= v then
+              cfg.enemy_tier = v
+              apply_kinds()
+              if watch then watch.refresh() end
+            end
+          end)
+        end
+      end
+    end
     -- keys: the first of an Arsenal key's names the game knows
     local function engine_name(list)
       if not list then return 'off' end
@@ -382,19 +562,22 @@ do
     key_row('marker_key', 'World markers key', cfg.mark, function(l) cfg.mark = l end)
     key_row('zoom_in', 'Zoom in key', cfg.zin, function(l) cfg.zin = l end)
     key_row('zoom_out', 'Zoom out key', cfg.zout, function(l) cfg.zout = l end)
-    -- the kinds
-    local NAMES = { credit = 'Super Credits', medal = 'Medals', common = 'Common Samples', rare = 'Rare Samples',
-      super = 'Super Samples', requisition = 'Requisition Slips', ammo = 'Ammo Boxes', grenade = 'Grenade Packs',
-      stim = 'Stim Packs', fabricator = 'Fabricators', bulkfab = 'Bulk Fabricators', ilship = 'Warp Ships',
-      bughole = 'Bug Holes', weapon = 'Weapons' }
-    for _, k in ipairs(KINDS) do
-      toggle('kind_' .. k.id, 'Show ' .. (NAMES[k.id] or k.id), cfg.kinds[k.id], function(v)
-        if cfg.kinds[k.id] ~= v then
-          cfg.kinds[k.id] = v
-          apply_kinds()
-          if watch then watch.refresh() end
-        end
-      end)
+    -- last: Show Weapons, then a row for each weapon (all on to start), sorted by name
+    local wk = M.weapon_kind
+    if wk then
+      kind_row(wk)
+      local ids = {}
+      for _, u in ipairs(wk.units) do ids[#ids + 1] = u end
+      table.sort(ids, function(x, y) return wk.names[x] < wk.names[y] end)
+      for _, u in ipairs(ids) do
+        toggle('weapon_' .. u, '  ' .. wk.names[u], true, function(v)
+          if cfg.weapons_off[u] ~= (not v or nil) then
+            cfg.weapons_off[u] = not v or nil
+            apply_kinds()
+            if watch then watch.refresh() end
+          end
+        end)
+      end
     end
     chef.log('options menu: every setting is in the loader\'s options menu too (Treasure Radar)')
   end
@@ -407,6 +590,9 @@ local function log_settings(from)
     tostring(cfg.radar), cfg.scale, cfg.rotate and ', turning with my view' or '', cfg.still and ', still' or '',
     tostring(cfg.ledger), range_now, floor(cfg.opacity * 100 + 0.5),
     cfg.markers and (cfg.markers >= ENDLESS and 'endless' or (cfg.markers .. ' m')) or 'off')
+  local off = {}
+  for u in pairs(cfg.weapons_off) do off[#off + 1] = M.weapon_kind.names[u] or u end
+  if #off > 0 then table.sort(off); chef.log('weapons switched off (%d): %s', #off, table.concat(off, ', ')) end
   local function keys(l) return l and table.concat(l, '/') or 'off' end
   chef.log('keys: hide %s%s | zoom %s / %s | world markers %s', keys(cfg.hide), cfg.tab and ' (or double-tap Tab)' or '',
     keys(cfg.zin), keys(cfg.zout), keys(cfg.mark))
@@ -427,7 +613,8 @@ local dead = { mission = nil, units = {} }
 local struct_uk = {}
 local next_alive = 0
 
--- Has this structure been destroyed? Either its kind's dead_mesh hides, or its animation state reaches dead_state.
+-- Has this enemy structure been destroyed? Its kind's dead_mesh hides, or its animation state reaches dead_state (a
+-- kind can have both: a fabricator's state moves only when it's destroyed while I'm there, its meshes always swap).
 -- I ask a unit whether it has a state machine before reading its state: asking one without crashes the game, and
 -- some colony fabricators have none. Each call runs under its own unit kind's crash key, so one bug hole type that
 -- misbehaves can't silence the other three.
@@ -439,10 +626,8 @@ local function is_destroyed(u, k, uk)
     local m = chef.call_kind('Unit.mesh', key, u, k.dead_mesh)
     if m ~= nil and chef.call_kind('Mesh.visibility', key, m) == false then
       dead.units[u] = true
-      chef.log('a %s was destroyed (mesh %d hidden)', k.say, k.dead_mesh)
       return true
     end
-    return false
   end
   if not k.dead_state then return false end
   if chef.call_kind('Unit.has_animation_state_machine', key, u) ~= true then return false end
@@ -450,7 +635,6 @@ local function is_destroyed(u, k, uk)
   if type(st) ~= 'number' then return false end
   if st >= k.dead_state then
     dead.units[u] = true
-    chef.log('a %s was destroyed (state %d)', k.say, st)
     return true
   end
   return false
@@ -469,34 +653,45 @@ local function spent(it)
   if chef.call_kind('Unit.has_animation_state_machine', key, it.unit) ~= true then return false end
   return chef.call_kind('Unit.animation_get_state', key, it.unit) == 0
 end
-local last_at = {}            -- a weapon unit -> where the previous list had it (to tell a still one from a carried one)
 local function carried(it, divers)
   local z = it.z or 0
-  local near = false
   for i = 1, #divers do
     local d = divers[i]
     local up = z - (d.z or 0)
     local h2 = (d.x - it.x) ^ 2 + (d.y - it.y) ^ 2
     if up >= CARRY_UP_MIN and up <= CARRY_UP_MAX and h2 <= CARRY_NEAR * CARRY_NEAR then return true end
-    if up >= NEAR_DOWN and up <= NEAR_UP and h2 <= NEAR_REACH * NEAR_REACH then near = true end
+    -- in the wider reach of someone alive: in their hands or on their back, even standing still
+    if d.live and up >= NEAR_DOWN and up <= NEAR_UP and h2 <= NEAR_REACH * NEAR_REACH then return true end
   end
-  if not near then return false end
-  -- near someone: carried unless it lay in the same spot at the last list too
-  local was = last_at[it.unit]
-  return not (was and (was.x - it.x) ^ 2 + (was.y - it.y) ^ 2 + ((was.z or 0) - z) ^ 2 <= STILL_M * STILL_M)
+  return false
 end
-local weapons_said = nil
 
 local function rebuild(items)
   counts, stacks, gone, gone_n, pickups, stack_of, listed_at, struct_uk = {}, {}, {}, {}, {}, {}, {}, {}
-  local divers, n_carried, n_spent = {}, 0, 0
-  if WEAPONS_ON then
-    for _, it in ipairs(items) do if CARRIERS[it.kind] then divers[#divers + 1] = it end end
+  -- which Helldiver is me (the one nearest my camera, within 6 m): the radar's middle, so never one of its squad dots
+  M.me = nil
+  local cam, near = chef.camera(), 36
+  for _, it in ipairs(items) do
+    if it.kind == DIVER then
+      local d2 = cam and (it.x - cam.x) ^ 2 + (it.y - cam.y) ^ 2
+      if d2 and d2 < near then near, M.me = d2, it.unit end
+    end
   end
-  local spots = {}
+  local divers, n_carried, n_spent, n_bodies = {}, 0, 0, 0
+  -- the enemies: their own list (not in the piles, the ledger or the markers), keeping where each was last seen
+  local old_hv, hv = {}, {}
+  for _, h in ipairs(M.foes) do if not h.gone then old_hv[h.unit] = h end end
+  if WEAPONS_ON then
+    for _, it in ipairs(items) do
+      if CARRIERS[it.kind] then
+        local live = chef.call_kind('Unit.has_animation_state_machine', 'c' .. it.kind, it.unit) == true
+        divers[#divers + 1] = { x = it.x, y = it.y, z = it.z, live = live }
+        if not live then n_bodies = n_bodies + 1 end
+      end
+    end
+  end
   for _, it in ipairs(items) do
     local k = kind_of_unit[it.kind]
-    if k and k.weapon then spots[it.unit] = it end
     if k and k.weapon and spent(it) then
       n_spent = n_spent + 1
       k = nil
@@ -504,31 +699,39 @@ local function rebuild(items)
       n_carried = n_carried + 1
       k = nil
     end
+    if k and k.enemy then
+      if not M.foe_dead[it.unit] and it.unit ~= M.me then
+        hv[#hv + 1] = old_hv[it.unit] or { unit = it.unit, uk = it.kind, k = k, x = it.x, y = it.y, tier = k.tier[it.kind] or 1 }
+      end
+      k = nil
+    end
     if k and k.structure then struct_uk[it.unit] = it.kind end
     if k and k.structure and is_destroyed(it.unit, k, it.kind) then k = nil end
     if k then
       counts[k.id] = (counts[k.id] or 0) + 1
+      local x, y, z = it.x, it.y, it.z or 0
       -- weapons pile up only with the same weapon (each has its own silhouette)
       local wid = k.weapon and it.kind or nil
       if wid then listed_at[it.unit] = it end
       local joined = false
       for _, s in ipairs(stacks) do
-        if s.kind == k and s.wid == wid and (s.x - it.x) ^ 2 + (s.y - it.y) ^ 2 <= k.stack * k.stack then
+        if s.kind == k and s.wid == wid and (s.x - x) ^ 2 + (s.y - y) ^ 2 <= k.stack * k.stack then
           s.n = s.n + 1; stack_of[it.unit] = s; joined = true; break
         end
       end
       if not joined then
-        stacks[#stacks + 1] = { kind = k, wid = wid, x = it.x, y = it.y, z = it.z or 0, n = 1 }
+        stacks[#stacks + 1] = { kind = k, wid = wid, x = x, y = y, z = z, n = 1 }
         stack_of[it.unit] = stacks[#stacks]
       end
-      local z, near = it.z or 0, nil
+      local near = nil
       for _, p in ipairs(pickups) do
-        if p.kind == k and p.wid == wid and (p.x - it.x) ^ 2 + (p.y - it.y) ^ 2 + (p.z - z) ^ 2 <= MARK_STACK * MARK_STACK then near = p; break end
+        if p.kind == k and p.wid == wid and (p.x - x) ^ 2 + (p.y - y) ^ 2 + (p.z - z) ^ 2 <= MARK_STACK * MARK_STACK then near = p; break end
       end
       if near then near.units[#near.units + 1] = it.unit
-      else pickups[#pickups + 1] = { kind = k, wid = wid, units = { it.unit }, x = it.x, y = it.y, z = z } end
+      else pickups[#pickups + 1] = { kind = k, wid = wid, units = { it.unit }, x = x, y = y, z = z } end
     end
   end
+  M.foes, M.foe_i = hv, 0
   for _, k in ipairs(active) do
     local c = counts[k.id] or 0
     if c > (seen_max[k.id] or 0) then seen_max[k.id] = c end
@@ -537,15 +740,11 @@ local function rebuild(items)
   table.sort(stacks, function(a, b) return a.kind.rank > b.kind.rank end)
   local parts = {}
   for _, k in ipairs(active) do
-    if not k.weapon and (seen_max[k.id] or 0) > 0 then parts[#parts + 1] = k.id .. ' ' .. (counts[k.id] or 0) .. '/' .. seen_max[k.id] end
+    if not k.weapon and not k.enemy and (seen_max[k.id] or 0) > 0 then parts[#parts + 1] = k.id .. ' ' .. (counts[k.id] or 0) .. '/' .. seen_max[k.id] end
   end
+  -- (a release logs the ledger once, at the mission's end)
   local line = table.concat(parts, ', ')
-  if line ~= M.last_line then M.last_line = line; chef.log('ledger: %s', line ~= '' and line or 'nothing found yet') end
-  if WEAPONS_ON then
-    local w = string.format('%d on the ground, %d carried, %d spent, %d Helldivers and SEAF', counts.weapon or 0, n_carried, n_spent, #divers)
-    if w ~= weapons_said then weapons_said = w; chef.log('weapons: %s', w) end
-    last_at = spots
-  end
+  M.last_line = line
 end
 
 -- has this weapon left the spot it was listed at (more than half a meter)? Each unit has its own spot: two of a weapon
@@ -579,11 +778,171 @@ local function check_alive(cam)
             or ((p.kind.dead_state or p.kind.dead_mesh) and is_destroyed(u, p.kind, struct_uk[u]))) then
           gone[u] = true
           gone_n[p.kind.id] = (gone_n[p.kind.id] or 0) + 1
-          if p.kind.weapon then last_at[u] = nil end
           local s = stack_of[u]
           if s then s.n = s.n - 1 end
         end
       end
+    end
+  end
+end
+
+-- The enemies move, so while the radar shows I keep reading where they are: each one inside the radar's range (and
+-- FOE.NEAR meters past it) every FOE.EVERY_NEAR seconds, the rest every FOE.EVERY_FAR, at most FOE.BUDGET reads a
+-- frame. Each is checked alive first: asking a removed unit's position crashes the game. One that's gone drops off.
+-- A killed enemy's body stays in the world, but its animation state machine goes away (a Hulk goes to state 12, then
+-- has none). So once a kind of enemy has been seen with a state machine, one without is a body: it drops off and stays
+-- off for the mission. A kind never seen with one stays shown (a live enemy is never hidden on a guess).
+M.foes, M.foe_i, M.foe_dead = {}, 0, {}
+-- kinds seen with a state machine while alive (SEAF troopers, Hulk, Hulk Scorcher, Tank, Factory Strider); others are
+-- learned as seen
+M.foe_asm = { ['7a3637cd33a54e4c'] = true, ['75f7e96af7dcd303'] = true, ['846bc06c6b213a06'] = true, ['b16493b009eec762'] = true, ['00bcf8247a544cdc'] = true, ['d37e8d120d2836e3'] = true,
+  ['4d1c334d294dfa97'] = true }
+local FOE = { BUDGET = 30, NEAR = 40, EVERY_NEAR = 0.1, EVERY_FAR = 1 }
+-- The dying: an enemy keeps its state machine while it plays its death, so a dead one would linger a few seconds.
+-- The last state each kind's dead were in before theirs went is its death state (seen DEATH_SEEN times, it counts):
+-- one in it is hidden at once.
+-- Some kinds die without leaving the state they stand around in (Nursing Spewers and Hunters go from state 0 straight
+-- to no state machine): state 0 on the first layer is never learned as a death state, nor is the state one was in when
+-- I first read it, or every live one standing in it would be hidden.
+-- A state one is seen leaving for another (still with its state machine) is one the living use: it's never a death
+-- state for that kind again (M.foe_live), so a live one isn't hidden every time it passes through it (Devastators
+-- and SEAF troopers often end in a state they also walk around in).
+-- The state call answers one state per animation layer (up to 4). Each layer is learned the same way, its states kept
+-- as layer * M.LAYER + state (layer 1 as the bare state): a body layer that only the dead switch to shows a death the
+-- first layer doesn't (SEAF troopers' layers 3 and 4 go to 197 and 43 as they die).
+-- A body layer (2 to 4) that drops to 0 as one dies can show a death too (an Overseer's layer 3 sits at 3 its whole
+-- life and goes to 0 when it dies), but only one I know from the start and only for one that wasn't at 0 when I first
+-- read it. 0 is never learned: kinds like the Harvester switch a layer to 0 and back while alive.
+-- So does the whole set of layers together (M.combo, a negative key), for kinds whose dead end in states the living
+-- each use on their own but never all at once.
+-- Only deaths that weren't already hidden teach anything: a kind whose dead are caught doesn't need more death
+-- states, and every extra one is a chance to hide a live one.
+-- And one still "dying" after M.DYING_MAX seconds is alive (a body loses its state machine within about 10 s): it
+-- shows again, and that state is one the living use from then on.
+-- Learned through the game session; known from the start: Hulk 12, Trooper 60, Commissar 60, Warrior 26, Hive Guard
+-- 26, Brood Commander 24, Scavenger 18, Voteless 31 (all three), the SEAF trooper's layers 3 = 197, 4 = 43, the
+-- Overseer's layer 3 = 0, the Crescent Overseer's layer 2 = 9 and the Elevated Overseer's layers 2 = 5, 3 = 2.
+M.LAYER, M.DYING_MAX = 100000, 15
+M.foe_death = { ['846bc06c6b213a06'] = { [12] = 2 }, ['b2b3056bdf28e57b'] = { [60] = 2 }, ['a71aafd82c6ebc92'] = { [60] = 2 },
+  ['09872e66d1276e1f'] = { [26] = 2 }, ['a1f37bf2a40fbde4'] = { [26] = 2 }, ['d522fd4748d443a5'] = { [24] = 2 },
+  ['c14e0e887e7d2106'] = { [18] = 2 }, ['78e1497571012c47'] = { [31] = 2 }, ['0adc9f9173ad8e1d'] = { [31] = 2 },
+  ['44458a2c52b002fb'] = { [31] = 2 }, ['75f7e96af7dcd303'] = { [300197] = 2, [400043] = 2 },
+  ['da40bb347c7447f2'] = { [300000] = 2 }, ['e8f19a0aa958e46d'] = { [200009] = 2 },
+  ['604a794ec45bb820'] = { [200005] = 2, [300002] = 2 } }
+M.foe_live = {}
+M.lay = {}   -- the layer states of the enemy being read (one table for all)
+-- every layer's state as one key (states 0-1023), or nil for a kind that answers one layer
+function M.state_ok(s) return type(s) == 'number' and s >= 0 and s <= 1023 and s % 1 == 0 end
+function M.combo(s1, s2, s3, s4)
+  if type(s2) ~= 'number' then return nil end
+  s3, s4 = s3 or 0, s4 or 0
+  local ok = M.state_ok
+  if not (ok(s1) and ok(s2) and ok(s3) and ok(s4)) then return nil end
+  return -1 - (s1 + s2 * 1024 + s3 * 1048576 + s4 * 1073741824)
+end
+-- a layer state as I log it: "state 60", "layer 3 at 197" or "layers 4/10/1/1"
+function M.say_state(k)
+  if k < 0 then
+    local c, s = -1 - k, {}
+    for i = 1, 4 do s[i] = c % 1024; c = floor(c / 1024) end
+    return 'layers ' .. table.concat(s, '/')
+  end
+  if k < M.LAYER then return 'state ' .. k end
+  return string.format('layer %d at %d', floor(k / M.LAYER), k % M.LAYER)
+end
+local DEATH_SEEN = 2
+-- Wrecks: a destroyed tank stays in the world with its state machine, settled in state 0 for good (every tank turret
+-- rides the same hull). One that was in another state before is a wreck while it's in that state; one that's in it
+-- from the start may be a live tank waiting, so it stays shown.
+M.foe_wreck = { ['00bcf8247a544cdc'] = 0 }
+M.learned = 0       -- death states learned this game session (for the mission summary)
+local function foe_update(cam)
+  local fs = M.foes
+  local n = #fs
+  if n == 0 then return end
+  local now = chef.time()
+  local near2 = (range_now + FOE.NEAR) ^ 2
+  local reads = 0
+  for _ = 1, n do
+    M.foe_i = M.foe_i % n + 1
+    local h = fs[M.foe_i]
+    if not h.gone and (h.next or 0) <= now then
+      reads = reads + 1
+      local key = 'h' .. h.uk
+      local alive = chef.call_kind('Unit.alive', key, h.unit) == true
+      if alive then
+        if chef.call_kind('Unit.has_animation_state_machine', key, h.unit) == true then
+          M.foe_asm[h.uk] = true
+          local s1, s2, s3, s4 = chef.call_kind('Unit.animation_get_state', key, h.unit)
+          local lay = M.lay
+          lay[1], lay[2], lay[3], lay[4], lay[5] = s1, s2, s3, s4, M.combo(s1, s2, s3, s4)
+          -- (each enemy keeps its layer states, and the ones I first read it in, in two tables of its own; the
+          -- combination of all its layers is the fifth)
+          local ls, lf, lt = h.ls, h.lf, h.lt
+          if not ls then ls, lf, lt = {}, {}, {}; h.ls, h.lf, h.lt = ls, lf, lt end
+          local wk = M.foe_wreck[h.uk]
+          local ds, lv = M.foe_death[h.uk], M.foe_live[h.uk]
+          local was = h.dying
+          h.dying = false
+          for l = 1, 5 do
+            local s = lay[l]
+            local k = type(s) == 'number' and ((l == 1 or l == 5) and s or l * M.LAYER + s) or nil
+            local old = ls[l]
+            if h.lf_done == nil then lf[l] = k or false end
+            -- it left old alive, so the living use old (a tank's wreck state counts only once it has moved before)
+            if old and k and k ~= old and (old ~= wk or h.woke) then
+              if not lv then lv = {}; M.foe_live[h.uk] = lv end
+              if not lv[old] then
+                lv[old] = true
+              end
+            end
+            if k ~= old then lt[l] = now end
+            ls[l] = k
+            -- in one of its kind's death states: hidden now, though only for good once its state machine goes
+            -- (a layer at 0 only if it wasn't at 0 when I first read this one)
+            if k and not (lv and lv[k]) and ds and (ds[k] or 0) >= DEATH_SEEN and (k % M.LAYER ~= 0 or k ~= lf[l]) then
+              h.dying = k
+            end
+          end
+          h.lf_done = true
+          h.st = ls[1]
+          if wk and h.st and h.st ~= wk then h.woke = true end
+          if h.woke and h.st == wk and not (lv and lv[wk]) then h.dying = wk end
+          -- dying for too long: alive after all (a tank's wreck stays for good, so not a wreck)
+          if not h.dying or h.dying ~= h.dk then h.dk, h.dt = h.dying, now end
+          if h.dying and h.dying ~= wk and now - h.dt > M.DYING_MAX then
+            if not lv then lv = {}; M.foe_live[h.uk] = lv end
+            lv[h.dying] = true
+            h.dying, h.dk = false, nil
+          end
+        elseif M.foe_asm[h.uk] then
+          alive = false
+          M.foe_dead[h.unit] = true
+          -- the states it was in last are its kind's death states; each counts after DEATH_SEEN deaths. Only a state
+          -- it went into in its last 30 s: a body lies at most about 20 s, and one it held longer is a live one.
+          -- (Nothing to learn from one already hidden while dying.)
+          local ls, lf, lt, lv = h.ls, h.lf, h.lt, M.foe_live[h.uk]
+          for l = 1, (ls and not h.dying) and 5 or 0 do
+            local k = ls[l]
+            -- (a layer at 0 never, the first one included: that's where the idle stand)
+            if k and not (k >= 0 and k % M.LAYER == 0) and k ~= lf[l] and not (lv and lv[k]) and now - (lt[l] or now) <= 30 then
+              local ds = M.foe_death[h.uk] or {}
+              M.foe_death[h.uk] = ds
+              ds[k] = (ds[k] or 0) + 1
+              if ds[k] == DEATH_SEEN then
+                M.learned = M.learned + 1
+              end
+            end
+          end
+        end
+      end
+      local v = alive and chef.call_kind('Unit.world_position', key, h.unit, 1)
+      local x, y, z
+      if v then x, y, z = chef.call('Vector3.to_elements', v) end
+      if type(x) == 'number' then h.x, h.y, h.z = x, y, z else h.gone = true end
+      -- read again soon if it's on the radar or close to its edge, else in a while
+      h.next = now + (((h.x or 0) - cam.x) ^ 2 + ((h.y or 0) - cam.y) ^ 2 <= near2 and FOE.EVERY_NEAR or FOE.EVERY_FAR)
+      if reads >= FOE.BUDGET then break end
     end
   end
 end
@@ -751,6 +1110,36 @@ local function draw_radar(px, cam, cx, cy, R)
       end
     end
   end
+  -- the enemies and SEAF troopers, over the pickups, only inside the range (no edge markers for them): heavies as the
+  -- skull, the rest as the dot (medium ones and troopers bigger), drawn after the dots so the skulls sit on top
+  if #M.foes > 0 and (cfg.kinds.enemy or cfg.kinds.friend or cfg.kinds.squad) then
+    local r2 = range_now * range_now
+    for pass = 1, 2 do
+      for _, h in ipairs(M.foes) do
+        local fk = h.k
+        if not h.gone and not h.dying and cfg.kinds[fk.id] and (h.tier == 3) == (pass == 2) then
+          local pal = palette(fk)
+          local dx, dy = h.x - cam.x, h.y - cam.y
+          if dx * dx + dy * dy <= r2 then
+            dx, dy = turn(dx, dy)
+            local sx, sy = cx + dx * scale, cy + dy * scale
+            local half = (h.tier == 3 and 5.5) or (h.tier == 2 and 2.6) or 1.8
+            half = half * px
+            -- the dot textures carry their color (the tint is white): red enemies, blue SEAF and civilians, green squad
+            local tex = h.tier == 3 and fk.texture or fk.dot_tex
+            if not (tex and chef.bitmap(tex, sx - half, sy - half, 2 * half, 2 * half, pal.tint, 926 + pass)) then
+              if h.tier == 3 then
+                chef.rect(sx - 4.5 * px, sy - 4.5 * px, 9 * px, 9 * px, pal.back, 927)
+                chef.sprite(sx - 4.5 * px, sy - 4.5 * px, ICON[fk.icon], px, pal, 928)
+              else
+                chef.rect(sx - half, sy - half, 2 * half, 2 * half, pal.X, 926)
+              end
+            end
+          end
+        end
+      end
+    end
+  end
   -- me, and which way I'm looking (always up with Rotate With View)
   local vx, vy = fx, fy
   if cfg.rotate then vx, vy = 0, 1 end
@@ -764,8 +1153,8 @@ end
 -- Left of the radar, its bottom level with the radar's. Each kind is a small tile, its icon over its count (a check
 -- mark once it's cleared), with a thin line in its color along the top. Rows, top to bottom: the enemy structures,
 -- then Super Credits, Medals and Requisition Slips, then the samples, then the supplies. A row shows the kinds the
--- mission has (seen at least once), right-aligned beside the radar; a cleared kind keeps its tile, dimmed, with a gray
--- line.
+-- mission has (seen at least once), right-aligned beside the radar; a cleared kind keeps its tile, dimmed, with a
+-- gray line.
 local LEDGER_ROWS = {
   { 'fabricator', 'bulkfab', 'ilship', 'bughole' },
   { 'credit', 'medal', 'requisition' },
@@ -779,7 +1168,8 @@ local TILE_W, TILE_H, TILE_GAP, ROW_GAP, TILE_ICON = 15, 17, 1.5, 3, 8.5
 -- the rows shown this frame, in tables kept from frame to frame (row_n[i]: how many kinds row i has now)
 local rows, row_n = {}, {}
 for i = 1, #LEDGER_ROWS do rows[i] = {} end
-local function draw_ledger(px, right_x, bottom)
+-- edge_x: the ledger's right edge, or its left edge with `left` (when the radar sits on the left of the screen)
+local function draw_ledger(px, edge_x, bottom, left)
   local n = 0
   for _, ids in ipairs(LEDGER_ROWS) do
     local c = 0
@@ -803,7 +1193,7 @@ local function draw_ledger(px, right_x, bottom)
   local line = max(1, floor(px * 0.9 + 0.5))
   for r = 1, n do
     local ks, kn = rows[r], row_n[r]
-    local x = floor(right_x - kn * tw_ - (kn - 1) * tg + 0.5)
+    local x = floor((left and edge_x or edge_x - kn * tw_ - (kn - 1) * tg) + 0.5)
     for j = 1, kn do
       local k = ks[j]
       local left = max(0, (counts[k.id] or 0) - (gone_n[k.id] or 0))
@@ -912,7 +1302,6 @@ local function dropping(cam)
     if v > DROP_SPEED then
       drop.since = drop.since or (t - dt)
       if t - drop.since >= DROP_FOR then
-        if not drop.fall_at or t - drop.fall_at > DROP_AFTER then chef.log('drop: falling (%.0f m/s)', v) end
         drop.fall_at = t
       end
     else
@@ -929,27 +1318,39 @@ local function dropping(cam)
   return true
 end
 
+-- once a mission is over (back on the ship, or straight into the next): what its ledger ended on
+function M.mission_over()
+  if not M.live then return end
+  M.live = false
+  chef.log('mission over: %s | enemy death states learned so far: %d',
+    (M.last_line or '') ~= '' and 'ledger ' .. M.last_line or 'no loot found', M.learned)
+end
 local hud_next = 0
 local waiting_gen = nil
 function M.update(dt)
   frame_no = frame_no + 1
-  if #active == 0 or not chef.in_mission() then
+  local here = chef.in_mission()
+  if #active == 0 or not here then
+    if not here then M.mission_over() end
     -- every kind unticked in the options menu, or no mission: the unit list rests
     if watch then watch.pause() end
     return
   end
   if chef.world_id() ~= mission_id then
     -- a new mission: nothing from the last one carries over
+    M.mission_over()
     mission_id = chef.world_id()
     seen_max, counts, stacks, pickups, stack_of, gone, gone_n, listed_at = {}, {}, {}, {}, {}, {}, {}, {}
-    last_at, struct_uk, dead.mission, dead.units = {}, {}, mission_id, {}
+    struct_uk, dead.mission, dead.units = {}, mission_id, {}
+    M.foes, M.foes_said, M.foe_dead, M.foe_i = {}, nil, {}, 0
     last_gen = watch and watch.generation or -1
-    hud.no_id, hud.no_file, hud_next, M.last_line, weapons_said = nil, nil, 0, nil, nil
+    hud.no_id, hud.no_file, hud_next, M.last_line, M.weapons_said = nil, nil, 0, nil, nil
     if not M.keys_checked then M.keys_checked = true; check_keys() end
     local n = 0
     for _ in pairs(watch_kinds) do n = n + 1 end
     chef.log('new mission (world %d): watching %d unit kinds', mission_id, n)
   end
+  M.live = true
   read_keys()
   -- nothing to draw: the unit list rests until something is shown again
   local markers_up = cfg.markers ~= nil and markers_on
@@ -983,23 +1384,24 @@ function M.update(dt)
   draw_markers(px, cam, w, h)
   if chef.time() >= hud_next then hud_next = chef.time() + HUD_EVERY; read_hud() end
   if hidden then return end
-  local cx, cy = layout(w, h)
   local R = MY_RADIUS * h * cfg.scale
-  -- beside the map, not under it: left of the map's rim by MAP_GAP, its center level with the map's
-  cx = cx - MAP_RIM * h - MAP_GAP * h - R
+  local cx, cy, ledger_left = M.place(w, h, R)
   local ui = px * cfg.scale
   if M.logged ~= mission_id then
     M.logged = mission_id
-    chef.log('screen %dx%d: radar at %d, %d (from the bottom left), radius %d, %s', w, h, floor(cx), floor(cy),
-      floor(R), cfg.rotate and 'turning with my view' or 'north up')
+    chef.log('screen %dx%d: radar at %d, %d (from the bottom left; position %s, moved %d, %d), radius %d, %s', w, h,
+      floor(cx), floor(cy), tostring(cfg.pos), cfg.nudge_x, cfg.nudge_y, floor(R), cfg.rotate and 'turning with my view' or 'north up')
   end
   if cfg.radar then
+    if cfg.kinds.enemy or cfg.kinds.friend or cfg.kinds.squad then foe_update(cam) end
     draw_radar(ui, cam, cx, cy, R)
     if zoom_note.text and chef.time() < zoom_note.until_t then
       btext(cx - tw(zoom_note.text, px) / 2, cy + R * 0.72, zoom_note.text, px, chef.color(255, 255, 255, 230), 945)
     end
   end
-  if cfg.ledger then draw_ledger(ui, cx - R - 6 * ui, cy - R) end
+  if cfg.ledger then
+    if ledger_left then draw_ledger(ui, cx + R + 6 * ui, cy - R, true) else draw_ledger(ui, cx - R - 6 * ui, cy - R) end
+  end
 end
 
 function M.shutdown() end

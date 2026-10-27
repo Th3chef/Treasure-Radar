@@ -161,9 +161,59 @@ def make_kind(kid):
         return make_weapons()
     if kid == 'structures':
         return make_structures()
-    if kid == 'objectives':
-        kid = 'objective'
+    if kid in ('enemies', 'enemies_heavy'):
+        kid = 'enemy'
+    if kid == 'friendlies':
+        return make_friendlies()
+    if kid == 'squadmates':
+        return make_friendlies(TM_COLORS['squaddot'])
+    if kid in ('enemies_all', 'enemies_medium'):
+        return make_enemies(kid == 'enemies_all')
     img = canvas(); icon(img, kid, 128, 128, 176); return img
+
+
+def make_position(key):
+    """a screen with the radar (and its ledger) in the picked spot; None: all the spots, faint"""
+    img = canvas()
+    d = ImageDraw.Draw(img)
+    x0, y0, x1, y1 = 20, 60, 236, 182                     # the screen, 16:9
+    d.rounded_rectangle((x0, y0, x1, y1), 8, outline=(120, 124, 128, 255), width=3)
+    spots = {'tl': (52, 88), 'tr': (204, 88), 'ml': (52, 121), 'mr': (204, 121), 'bl': (52, 154), 'br': (204, 154),
+             'map': (160, 154)}
+    d.ellipse((196, 140, 226, 170), outline=(90, 94, 98, 255), width=2)     # where the game's map opens
+    for k, (x, y) in spots.items():
+        if key is None or k == key:
+            col = (90, 210, 110, 255) if key else (90, 210, 110, 150)
+            d.ellipse((x - 17, y - 17, x + 17, y + 17), fill=(10, 40, 18, 255), outline=col, width=4)
+            d.line((x, y, x, y - 12), fill=col, width=3)
+    if key is None:
+        label(img, 'POSITION', 18, 36)
+    return img
+
+
+def make_friendlies(rgb=(80, 170, 255)):
+    """dots around me on the radar: blue (SEAF troopers and civilians), or green (the squad)"""
+    img = canvas()
+    disc(img, 128, 128, 112, plain=True)
+    me(img, 128, 128, 1.2)
+    dot = icon_textures.icon_master('enemydot', rgb).convert('RGBA')
+    for x, y in ((90, 100), (165, 95), (100, 170), (175, 160)):
+        d = dot.resize((30, 30), Image.LANCZOS)
+        img.alpha_composite(d, (x - 15, y - 15))
+    return img
+
+
+def make_enemies(light):
+    """a skull and dots on the radar: two medium dots, and with light ones, three small dots"""
+    img = canvas()
+    disc(img, 128, 128, 112, plain=True)
+    icon(img, 'enemy', 150, 100, 70)
+    for x, y in ((90, 150), (170, 170)):
+        icon(img, 'enemydot', x, y, 30)
+    if light:
+        for x, y in ((80, 95), (120, 190), (190, 130)):
+            icon(img, 'enemydot', x, y, 18)
+    return img
 
 
 # ---- weapons, Still Radar and the keys
@@ -254,7 +304,7 @@ def all_images(kinds):
            'markers': make_markers(), 'range': make_range()}
     for pct in (100, 75, 50, 25, 0): out[f'opacity_{pct}'] = make_opacity(pct)
     for k in ('small', 'medium', 'large'): out[f'size_{k}'] = make_size(k)
-    for m in (25, 50, 100, 200): out[f'markers_{m}'] = make_markers(m)
+    for m in (5, 10, 15, 25, 50, 100, 200): out[f'markers_{m}'] = make_markers(m)
     for m in (75, 100, 150, 200, 250, 300): out[f'range_{m}'] = make_range(m)
     for k in kinds: out[k] = make_kind(k)
     return out
