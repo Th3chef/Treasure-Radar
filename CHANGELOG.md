@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.7.1
+
+- Fixed: Rare Samples showed red in game, close to the enemies' red. They're orange now, and Super Samples show pink
+  instead of purple.
+- The options menu (F9) groups Treasure Radar's rows under headings (Radar, World markers, Loot, Enemies, Friendlies,
+  Keys, Weapons), with a hint on the less obvious rows. The headings need Chef Shared Loader 1.4.0 or newer; older
+  versions show the same rows without them.
+- The radar and the ledger hide while you ride the extraction shuttle out.
+- Enemies now come before the enemy structures, and Double-Tap Tab To Hide sits with the keys, in the options menu and
+  in your mod manager.
+
 ## 0.7.0
 
 - New: **Enemies** (optional): enemies inside the radar's range as red dots (medium ones bigger), heavies with the

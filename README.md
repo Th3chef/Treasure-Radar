@@ -6,7 +6,7 @@ https://github.com/user-attachments/assets/beb7f2cc-3027-453f-b04d-3c7e0bd07b2c
 
 *Every sample, medal, Super Credit, Requisition Slip and supply around you, plus the enemies, troopers and squadmates near you, on a sonar radar beside your map.*
 
-**Download:** `Treasure-Radar-0.7.0.zip` from the [latest release](https://github.com/Th3chef/Treasure-Radar/releases/latest) (not the source code). **Needs [Chef Shared Loader](https://github.com/Th3chef/Chef-Shared-Loader) 1.0.0 or newer**, installed as its own mod.
+**Download:** `Treasure-Radar-0.7.1.zip` from the [latest release](https://github.com/Th3chef/Treasure-Radar/releases/latest) (not the source code). **Needs [Chef Shared Loader](https://github.com/Th3chef/Chef-Shared-Loader) 1.0.0 or newer**, installed as its own mod.
 
 A round sonar radar sits just left of where the game's map opens (bottom right) and shows the loot and supplies still lying around you, with a ledger of what's left in the mission and markers floating over the pickups near you. If you like, it also shows dropped weapons, enemy structures, the enemies around you, SEAF troopers, civilians and your squad. Sweep up the loot and restock before extraction instead of running back and forth looking for it. It's the successor of Treasure Map, rebuilt for the current game.
 
@@ -26,7 +26,7 @@ A round sonar radar sits just left of where the game's map opens (bottom right) 
 - **Up to date:** a pickup near you that's picked up (by you or anyone else) leaves the radar, the markers and the ledger at once; farther away, within 3 seconds.
 - **Zoom:** the numpad's + and - step the radar's range from 50 to 500 m; it remembers the last one.
 - **Still or animated:** untick Radar Animation for a still radar with every pickup at full strength.
-- **Hide it:** F7, or tapping Tab twice quickly, hides or shows the radar and the ledger (a single tap still just opens the map).
+- **Hide it:** F7, or tapping Tab twice quickly, hides or shows the radar and the ledger (a single tap still just opens the map). It also hides by itself while you ride the extraction shuttle out.
 - **Your look:** Opacity (100, 75, 50, 25 or 0%: at 0 only the icons and counts are left), Size (Small, Medium or Large) and the radar's Range (75 to 300 m).
 - **Pick what you want:** each kind is its own option.
 - **Your keys:** pick the Hide Key, Zoom Keys and Markers Key in your mod manager, or bind them in game.
@@ -46,14 +46,15 @@ In your mod manager (Arsenal / HD2 Mod Manager), on the mod's row, in the same o
 - **Opacity**: 100% (without it), 75, 50, 25 or 0%: how solid the radar's panel and sweep and the ledger's tiles are.
 - **Radar Animation** (ticked by default): the sweep and the pickups lighting up; unticked, a still radar.
 - **World Markers**: 50 m (default), 5, 10, 15, 25, 100 or 200 m, or Endless (every pickup, however far).
-- **Double-Tap Tab To Hide** (ticked by default).
-- **Super Credits** (Super Credit blue), **Medals** (medal yellow), **Requisition Slips** (requisition yellow), **Common Samples** (green), **Rare Samples** (orange), **Super Samples** (pink), **Ammo Boxes** (the game's ammo yellow), **Grenade Packs** (olive green), **Stim Packs** (blue), **Enemy Structures** (deep red).
+- **Super Credits** (Super Credit blue), **Medals** (medal yellow), **Requisition Slips** (requisition yellow), **Common Samples** (green), **Rare Samples** (orange), **Super Samples** (pink), **Ammo Boxes** (the game's ammo yellow), **Grenade Packs** (olive green), **Stim Packs** (blue).
 - **Enemies** (red): All (without a pick), Medium and heavy, or Heavy only.
+- **Enemy Structures** (deep red).
 - **SEAF Troopers and Civilians** (blue), **Squadmates** (green).
+- **Double-Tap Tab To Hide** (ticked by default).
 - **Hide Key** (F7), **Markers Key** (F8), **Zoom Keys** (numpad + and -): pick another key or turn one off.
 - **Weapons** (white silhouettes): which weapons show is picked in the options menu (F9).
 
-**In game:** F7 or double-tap Tab: hide or show the radar and the ledger. Numpad + / -: zoom the radar. F8: hide or show the world markers. F9 (Chef Shared Loader's options menu): every setting above, including the keys, each kind and each weapon, plus sliders to move the radar.
+**In game:** F7 or double-tap Tab: hide or show the radar and the ledger. Numpad + / -: zoom the radar. F8: hide or show the world markers. F9 (Chef Shared Loader's options menu): every setting above, including the keys, each kind and each weapon, plus sliders to move the radar. With Chef Shared Loader 1.4.0 or newer, the rows there are grouped under headings, with a hint on the less obvious ones.
 
 ## Requirements
 
@@ -62,7 +63,7 @@ In your mod manager (Arsenal / HD2 Mod Manager), on the mod's row, in the same o
 ## Install / update
 
 1. Mod manager (Arsenal / HD2 Mod Manager): add Chef Shared Loader (1.0.0 or newer) and enable it.
-2. Add `Treasure-Radar-0.7.0.zip` and enable it, tick Treasure Radar (core), the kinds you want and any options, then **Purge** and **Deploy**. Keep Chef Shared Loader last in your load order.
+2. Add `Treasure-Radar-0.7.1.zip` and enable it, tick Treasure Radar (core), the kinds you want and any options, then **Purge** and **Deploy**. Keep Chef Shared Loader last in your load order.
 3. Updating from 0.6.0: the options are in a new order, so check your picks once before you Purge and Deploy.
 4. Updating from 0.5.1 or older: install Chef Shared Loader at the same time. Those versions had the loader built in; 0.6.0 and newer don't.
 5. Updating from Treasure Map: disable or remove Treasure Map first (it needs the old loaders, which no longer work on the current game).
