@@ -34,7 +34,7 @@ if '--header-from' in args:
     HEADER = open(args[args.index('--header-from') + 1], 'rb').read()[12:72]
 assert len(HEADER) == 60
 
-TM_VERSION = '0.7.0'
+TM_VERSION = '0.7.1'
 NEEDS_LOADER = '1.0.0'                                     # the oldest Chef Shared Loader Treasure Radar runs on
 TM_GUID = 'dde1d14f-762f-4abf-85ed-42846077674c'           # Treasure Radar
 TM_TEST_GUID = '8e41c7a2-3f5d-4b90-a6e1-0d29b7f4c853'      # Treasure Radar Tester and test builds (installs beside it)
@@ -51,7 +51,10 @@ TM_KINDS = [  # (option folder, Arsenal name, description, options table as Lua)
     ('grenade', 'Grenade Packs', 'In olive green.', "{ kinds = { grenade = true } }"),
     ('stim', 'Stim Packs', 'In blue.', "{ kinds = { stim = true } }"),
 ]
-TM_COLORS = {'credit': (115, 233, 242), 'super': (255, 114, 211), 'rare': (255, 151, 64), 'medal': (255, 221, 31),
+# (the game's world darkens the middle of each channel on the way to the screen: rare's orange and super's pink are
+# picked light so they land orange and pink there, not red and purple. Not too light: the ledger draws its icons fully
+# solid, where the radar's are 72% between sweeps, so a pastel looks rich on the radar but faded in the ledger)
+TM_COLORS = {'credit': (115, 233, 242), 'super': (255, 140, 220), 'rare': (255, 190, 80), 'medal': (255, 221, 31),
              'common': (95, 220, 60), 'requisition': (244, 247, 56), 'ammo': (255, 234, 128), 'grenade': (135, 170, 45),
              'stim': (60, 140, 255), 'enemy': (255, 70, 50), 'enemydot': (255, 70, 50), 'frienddot': (80, 170, 255), 'squaddot': (60, 230, 120), 'fabricator': (190, 20, 30), 'bulkfab': (190, 20, 30), 'ilship': (190, 20, 30), 'bughole': (190, 20, 30)}
 # Weapons (a kind outside the ledger), Still Radar and the keys. Key ids are the addon's KEYS names.
@@ -345,9 +348,10 @@ def build_tm():
     # in the same order as the addon's rows in the loader's options menu (F9): the look, what shows, the keys, weapons
     by_name = {o['Name']: o for o in options}
     order = ['Treasure Radar (core)', 'Loot Ledger', 'Size', 'Radar Position', 'Range', 'Rotate With View', 'Opacity',
-             'Radar Animation', 'World Markers', 'Double-Tap Tab To Hide', 'Super Credits', 'Medals', 'Requisition Slips',
+             'Radar Animation', 'World Markers', 'Super Credits', 'Medals', 'Requisition Slips',
              'Common Samples', 'Rare Samples', 'Super Samples', 'Ammo Boxes', 'Grenade Packs', 'Stim Packs',
-             STRUCT_KIND[1], ENEMY_KIND[1], FRIEND_KIND[1], SQUAD_KIND[1], 'Hide Key', 'Markers Key', 'Zoom Keys', WEAPON_KIND[1]]
+             ENEMY_KIND[1], STRUCT_KIND[1], FRIEND_KIND[1], SQUAD_KIND[1], 'Double-Tap Tab To Hide', 'Hide Key',
+             'Markers Key', 'Zoom Keys', WEAPON_KIND[1]]
     assert sorted(order) == sorted(by_name), set(order) ^ set(by_name)
     options = [by_name[n] for n in order]
     name = f'Treasure Radar {TM_VERSION}' + (' Tester' if TESTER else (f' Test {TEST}' if TEST else ''))

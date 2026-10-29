@@ -14,7 +14,7 @@
 local chef = ...
 -- my log is treasure_radar.log next to the loader's; a loader without own_log keeps my lines in chef_loader.log
 if type(chef.own_log) == 'function' then chef.own_log('treasure_radar') end
-local M = { version = '0.7.0' }
+local M = { version = '0.7.1' }
 local floor, sqrt, max, min, atan2, exp, pi = math.floor, math.sqrt, math.max, math.min, math.atan2, math.exp, math.pi
 
 -- Fallback icons, 9 x 9 (X = the kind's color, o = dark outline, . = empty), for when the textures can't be used.
@@ -48,9 +48,9 @@ local KINDS = {
     units = { '307e09e7698881ba', '294eda665270ac42', 'cf1ad44dedd1f257', '5016ee397fdcfb6c', '64b49b9d8a445266',
               '700e9500e95541bf', '86f3cb87d97942b4', '4efcb7e844be9e93', 'a2414ed6e129c19f', 'b39fcf5c73d5c383',
               'beb2a0f09e36bf72', 'd463836441cd0ba7', 'e4eeb96023df6a99' } },
-  { id = 'rare', icon = 'diamond', rgb = { 255, 151, 64 }, stack = 2,
+  { id = 'rare', icon = 'diamond', rgb = { 255, 190, 80 }, stack = 2,
     units = { '8208ea6cb095be54', 'ad972a2e815a49aa', 'bd30758426ed2566', 'defe062c2567c23d' } },
-  { id = 'super', icon = 'crystal', rgb = { 255, 114, 211 }, stack = 2, units = { '9d4935fa69b6b41a', 'b4d6f2f83bde45a9' } },
+  { id = 'super', icon = 'crystal', rgb = { 255, 140, 220 }, stack = 2, units = { '9d4935fa69b6b41a', 'b4d6f2f83bde45a9' } },
   { id = 'requisition', icon = 'slip', rgb = { 244, 247, 56 }, stack = 2, units = { 'da3c547d0e0e442f' } },
   { id = 'ammo', icon = 'ammo', rgb = { 255, 234, 128 }, stack = 10, supply = true, units = { '79ccffd281e3f3a9' } },
   { id = 'grenade', icon = 'grenade', rgb = { 135, 170, 45 }, stack = 10, supply = true, units = { '97af34fbf093409c' } },
@@ -466,15 +466,45 @@ do
   if HAS_MENU then
     chef.title('Treasure Radar')
     local function said(what, v) if not cfg.zooming then chef.log('menu: %s %s', what, tostring(v)) end end
+    -- The rows in groups under headings (subheadings indent theirs), and a hint on the less obvious rows. Only loaders
+    -- that draw headings get them (1.4.0 and newer); older ones show the same rows in the same order, without.
+    M.DECO = chef.has and chef.has('option_headings') and {
+      radar = { heading = 'Radar' },
+      position = { heading = 'Placement', sub = true,
+        hint = "Where the radar and the ledger sit: beside the game's map, or in a corner or at mid height on either side." },
+      nudge_x = { hint = 'Moves the radar a little left or right from its spot. It never leaves the screen.' },
+      nudge_y = { hint = 'Moves the radar a little up or down from its spot. It never leaves the screen.' },
+      range = { heading = 'View', sub = true, hint = 'How far out the radar shows. The zoom keys change it too.' },
+      rotate = { hint = 'The radar turns with you: the way you look is always up, and N, E, S and W move around the rim.' },
+      opacity = { hint = "How solid the radar's panel and sweep and the ledger's tiles are. The icons and counts stay solid." },
+      animation = { hint = 'The sweep that turns every 3 seconds and lights each pickup up as it passes. Off: a still radar.' },
+      world_markers = { heading = 'World markers',
+        hint = "Each pickup's icon floats over it in the world, with how far it is, within the range you pick." },
+      kind_credit = { heading = 'Loot' },
+      kind_common = { heading = 'Samples', sub = true },
+      kind_ammo = { heading = 'Supplies', sub = true },
+      kind_enemy = { heading = 'Enemies' },
+      enemy_tier = { hint = 'Medium and heavy skips the light ones (Scavengers, Hunters, Warriors, Troopers, Voteless and the like).' },
+      kind_fabricator = { heading = 'Enemy structures', sub = true },
+      kind_friend = { heading = 'Friendlies' },
+      tab = { heading = 'Keys', hint = 'Tap Tab twice quickly to hide or show the radar and the ledger.' },
+      kind_weapon = { heading = 'Weapons',
+        hint = "Support weapons and expendables lying on the ground, each with its own silhouette. Pick which ones below." },
+    } or nil
+    function M.dress(id, spec)
+      local d = M.DECO and M.DECO[id]
+      if d then spec.heading, spec.sub, spec.hint = d.heading, d.sub, d.hint end
+      return spec
+    end
     local function toggle(id, label, now, set)
-      local v = chef.option(id, { type = 'toggle', label = label, default = now == true })
+      local v = chef.option(id, M.dress(id, { type = 'toggle', label = label, default = now == true }))
       if v ~= nil then set(v == true) end
       chef.on_change(id, function(x) set(x == true); said(label, x) end)
     end
     local function choice(id, label, names, values, now, set)
       local def = 1
       for i, val in ipairs(values) do if val == now then def = i end end
-      local v = chef.option(id, { type = 'choice', label = label, choices = names, default = def })
+      local v = chef.option(id, M.dress(id, { type = 'choice', label = label, choices = names, default = def }))
       if type(v) == 'number' then set(values[v]) end
       chef.on_change(id, function(x) set(values[x]); said(label, names[x]) end)
     end
@@ -484,7 +514,7 @@ do
     choice('position', 'Position', { 'Beside the map', 'Top left', 'Top right', 'Middle left', 'Middle right', 'Bottom left',
       'Bottom right' }, { 'map', 'tl', 'tr', 'ml', 'mr', 'bl', 'br' }, cfg.pos, function(v) cfg.pos = v end)
     local function nudge(id, label, field)
-      local v = chef.option(id, { type = 'slider', label = label, min = -60, max = 60, step = 1, default = 0 })
+      local v = chef.option(id, M.dress(id, { type = 'slider', label = label, min = -60, max = 60, step = 1, default = 0 }))
       if type(v) == 'number' then cfg[field] = v end
       chef.on_change(id, function(x) cfg[field] = x; said(label, x) end)
     end
@@ -500,24 +530,23 @@ do
       cfg.zooming = false
     end
     toggle('rotate', 'Rotate with view', cfg.rotate, function(v) cfg.rotate = v end)
-    local op = chef.option('opacity', { type = 'slider', label = 'Opacity (%)', min = 0, max = 100, step = 5,
-                                        default = floor(cfg.opacity * 100 + 0.5) })
+    local op = chef.option('opacity', M.dress('opacity', { type = 'slider', label = 'Opacity (%)', min = 0, max = 100, step = 5,
+                                                         default = floor(cfg.opacity * 100 + 0.5) }))
     if type(op) == 'number' then cfg.opacity = op / 100 end
     chef.on_change('opacity', function(x) cfg.opacity = x / 100; said('opacity', x) end)
     toggle('animation', 'Radar animation', not cfg.still, function(v) cfg.still = not v end)
     -- (a choice is saved by its place in the list, so this row's values never change order)
     choice('world_markers', 'World markers', { 'Off', '5 M', '10 M', '15 M', '25 M', '50 M', '100 M', '200 M', 'Endless' },
       { false, 5, 10, 15, 25, 50, 100, 200, ENDLESS * 10 }, cfg.markers or false, function(v) cfg.markers = v or nil end)
-    toggle('tab', 'Double-tap Tab to hide', cfg.tab, function(v) cfg.tab = v end)
-    -- The rows in groups, top to bottom (the menu has rows only, no headings): the look (above), then what shows (loot
-    -- in ledger order, supplies, enemy structures, enemies, friendlies), then the keys, and the weapons last, as they
-    -- bring a row for every weapon. Arsenal lists its options in the same order.
+    -- The rows in groups, top to bottom: the look (above), then what shows (loot in ledger order, supplies, enemies,
+    -- enemy structures, friendlies), then the keys, and the weapons last, as they bring a row for every weapon. Arsenal
+    -- lists its options in the same order.
     local NAMES = { credit = 'Super Credits', medal = 'Medals', common = 'Common Samples', rare = 'Rare Samples',
       super = 'Super Samples', requisition = 'Requisition Slips', ammo = 'Ammo Boxes', grenade = 'Grenade Packs',
       stim = 'Stim Packs', fabricator = 'Fabricators', bulkfab = 'Bulk Fabricators', ilship = 'Warp Ships',
       bughole = 'Bug Holes', weapon = 'Weapons', enemy = 'Enemies', friend = 'SEAF Troopers and Civilians', squad = 'Squadmates' }
     local ORDER = { 'credit', 'medal', 'requisition', 'common', 'rare', 'super', 'ammo', 'grenade', 'stim',
-      'fabricator', 'bulkfab', 'ilship', 'bughole', 'enemy', 'friend', 'squad' }
+      'enemy', 'fabricator', 'bulkfab', 'ilship', 'bughole', 'friend', 'squad' }
     local by_id = {}
     for _, k in ipairs(KINDS) do by_id[k.id] = k end
     local function kind_row(k)
@@ -558,6 +587,7 @@ do
       use(b.key())
       chef.on_change(id, function(k) use(k); said(label, k) end)
     end
+    toggle('tab', 'Double-tap Tab to hide', cfg.tab, function(v) cfg.tab = v end)
     key_row('hide_key', 'Hide key', cfg.hide, function(l) cfg.hide = l end)
     key_row('marker_key', 'World markers key', cfg.mark, function(l) cfg.mark = l end)
     key_row('zoom_in', 'Zoom in key', cfg.zin, function(l) cfg.zin = l end)
@@ -569,8 +599,10 @@ do
       local ids = {}
       for _, u in ipairs(wk.units) do ids[#ids + 1] = u end
       table.sort(ids, function(x, y) return wk.names[x] < wk.names[y] end)
+      -- (under a subheading the menu indents them; without headings two spaces do)
+      if M.DECO and ids[1] then M.DECO['weapon_' .. ids[1]] = { heading = 'Each weapon', sub = true } end
       for _, u in ipairs(ids) do
-        toggle('weapon_' .. u, '  ' .. wk.names[u], true, function(v)
+        toggle('weapon_' .. u, (M.DECO and '' or '  ') .. wk.names[u], true, function(v)
           if cfg.weapons_off[u] ~= (not v or nil) then
             cfg.weapons_off[u] = not v or nil
             apply_kinds()
@@ -579,6 +611,8 @@ do
         end)
       end
     end
+    -- (the headings are only read while the rows are made)
+    M.DECO, M.dress = nil, nil
     chef.log('options menu: every setting is in the loader\'s options menu too (Treasure Radar)')
   end
 end
@@ -1325,6 +1359,57 @@ function M.mission_over()
   chef.log('mission over: %s | enemy death states learned so far: %d',
     (M.last_line or '') ~= '' and 'ledger ' .. M.last_line or 'no loot found', M.learned)
 end
+
+-- Riding the extraction shuttle, the radar hides. The game's network objects tell me: my player object (the one I own
+-- of the player type) names my avatar, and the avatar's field 64, entry 25 is the object I'm seated in (shuttle, FRV,
+-- tank, emplacement; 32767: none). A seat is the shuttle when its type is one of the shuttle types. Asked once a second,
+-- in a mission only, through chef.call (the loader's guarded reads); each new seat's type is asked once.
+M.SEAT = { EVERY = 1, NONE = 32767, PLAYER = 'un6y1d', AVATAR_FIELD = 'baegche', AVATAR = 'gl7xl2w', BIG = 80,
+  SHUTTLE = { 'ama9sqi', 'k477i5a', 'dtmgy_d', 'bosz5e5', 'aup5eiw', 'cdx3go0', '2amgf9d' } }
+function M.on_shuttle()
+  local S, Q, now = M.seat, M.SEAT, chef.time()
+  if S and now < S.next then return S.hide end
+  if not S then S = {}; M.seat = S end
+  S.next, S.hide = now + Q.EVERY, false
+  local s, peer = chef.call('Network.game_session'), chef.call('Network.peer_id')
+  if s == nil or peer == nil then return false end
+  -- my player object: found once, kept while it exists
+  if not (S.player and chef.call('GameSession.game_object_exists', s, S.player) == true) then
+    S.player = nil
+    local owned = chef.call('GameSession.objects_owned_by', s, peer)
+    if type(owned) ~= 'table' then return false end
+    for _, id in pairs(owned) do
+      if chef.call('GameSession.game_object_is_type', s, id, Q.PLAYER) == true then S.player = id; break end
+    end
+    if not S.player then return false end
+  end
+  local av = chef.call('GameSession.game_object_field', s, S.player, Q.AVATAR_FIELD)
+  if type(av) ~= 'number' or av <= 0 or av >= Q.NONE or chef.call('GameSession.game_object_is_type', s, av, Q.AVATAR) ~= true then
+    return false
+  end
+  local f = chef.call('GameSession.game_object_field_batched', s, av, {})
+  local seat = type(f) == 'table' and type(f[64]) == 'table' and f[64][25] or nil
+  if type(seat) ~= 'number' or seat == Q.NONE then S.seat = nil; return false end
+  if S.seat ~= seat then
+    -- a new seat: its type, once. Only when no type check can answer (an older loader, a renamed type) the size tells:
+    -- the shuttle has 80+ fields, an FRV 65, an emplacement 14
+    S.seat, S.shuttle = seat, false
+    local answered = false
+    for _, name in ipairs(Q.SHUTTLE) do
+      local is = chef.call('GameSession.game_object_is_type', s, seat, name)
+      if is ~= nil then answered = true end
+      if is == true then S.shuttle = true; break end
+    end
+    if not answered then
+      local sf, n = chef.call('GameSession.game_object_field_batched', s, seat, {}), 0
+      if type(sf) == 'table' then for _ in pairs(sf) do n = n + 1 end end
+      S.shuttle = n >= Q.BIG
+    end
+    chef.log('seated in object %d: %s', seat, S.shuttle and 'the shuttle, so the radar hides until I get out' or 'not the shuttle')
+  end
+  S.hide = S.shuttle
+  return S.hide
+end
 local hud_next = 0
 local waiting_gen = nil
 function M.update(dt)
@@ -1342,7 +1427,7 @@ function M.update(dt)
     mission_id = chef.world_id()
     seen_max, counts, stacks, pickups, stack_of, gone, gone_n, listed_at = {}, {}, {}, {}, {}, {}, {}, {}
     struct_uk, dead.mission, dead.units = {}, mission_id, {}
-    M.foes, M.foes_said, M.foe_dead, M.foe_i = {}, nil, {}, 0
+    M.foes, M.foes_said, M.foe_dead, M.foe_i, M.seat = {}, nil, {}, 0, nil
     last_gen = watch and watch.generation or -1
     hud.no_id, hud.no_file, hud_next, M.last_line, M.weapons_said = nil, nil, 0, nil, nil
     if not M.keys_checked then M.keys_checked = true; check_keys() end
@@ -1352,9 +1437,9 @@ function M.update(dt)
   end
   M.live = true
   read_keys()
-  -- nothing to draw: the unit list rests until something is shown again
+  -- nothing to draw (hidden without markers, or riding the shuttle out): the unit list rests until something is shown
   local markers_up = cfg.markers ~= nil and markers_on
-  if hidden and not markers_up then
+  if (hidden and not markers_up) or M.on_shuttle() then
     if watch then watch.pause() end
     return
   end
