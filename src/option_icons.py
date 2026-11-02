@@ -31,8 +31,10 @@ def disc(img, cx, cy, r, alpha=1.0, plain=False):
     img.alpha_composite(d, (cx - r, cy - r))
 
 
-def icon(img, kid, cx, cy, sz):
+def icon(img, kid, cx, cy, sz, alpha=1.0):
     ic = icon_textures.icon_image(kid, TM_COLORS[kid]).convert('RGBA').resize((sz, sz), Image.LANCZOS)
+    if alpha < 1:
+        ic.putalpha(ic.getchannel('A').point(lambda v: round(v * alpha)))
     img.alpha_composite(ic, (int(cx - sz / 2), int(cy - sz / 2)))
 
 
@@ -99,6 +101,17 @@ def make_opacity(pct=None):
     return img
 
 
+def make_icon_size(pct=None):
+    img = canvas()
+    disc(img, 128, 128, 104)
+    sz = round(34 * (pct or 150) / 100)
+    for kid, x, y in (('medal', 0.42, 0.42), ('super', 0.25, -0.5), ('rare', -0.42, -0.3), ('common', -0.4, 0.38)):
+        icon(img, kid, 128 + x * 104, 128 - y * 104, sz)
+    me(img, 128, 128, 1.0)
+    label(img, 'ICON SIZE' if pct is None else f'{pct}%', 196 if pct is None else 188, 34 if pct is None else 48)
+    return img
+
+
 def make_size(k=None):
     img = canvas()
     if k is None:
@@ -130,20 +143,69 @@ def make_rotate():
     return img
 
 
-def make_markers(m=None):
-    img = canvas()
-    d = ImageDraw.Draw(img)
-    # the ground going away from me
+def ground(d):
+    """the ground going away from me"""
     for i, y in enumerate((150, 172, 200, 236)):
         d.line((10, y, S - 10, y), fill=(55, 58, 60, 255), width=2)
     for x in (-300, -120, 60, 240, 420):
         d.line((128, 120, x, 256), fill=(55, 58, 60, 255), width=2)
-    for kid, x, y, sz, t in (('medal', 70, 128, 46, '18M'), ('credit', 180, 112, 34, '31M'), ('ammo', 150, 186, 54, '6M')):
-        icon(img, kid, x, y, sz)
+
+
+def marker(img, kid, x, y, sz, t=None, alpha=1.0):
+    """a world marker: the icon, with how far it is over it"""
+    d = ImageDraw.Draw(img)
+    icon(img, kid, x, y, sz, alpha)
+    if t:
         f = font(max(16, sz // 2))
         w = d.textlength(t, font=f)
-        d.text((x - w / 2, y - sz / 2 - f.size - 2), t, font=f, fill=(235, 235, 235, 255))
+        d.text((x - w / 2, y - sz / 2 - f.size - 2), t, font=f, fill=(235, 235, 235, round(255 * alpha)))
+
+
+def make_markers(m=None):
+    img = canvas()
+    ground(ImageDraw.Draw(img))
+    for kid, x, y, sz, t in (('medal', 70, 128, 46, '18M'), ('credit', 180, 112, 34, '31M'), ('ammo', 150, 186, 54, '6M')):
+        marker(img, kid, x, y, sz, t)
     label(img, 'MARKERS' if m is None else f'{m} M', 18, 38 if m is None else 48)
+    return img
+
+
+def enemy_marks(img, which='both', alpha=1.0):
+    """a heavy's skull with its distance and regular enemies' dots, as world markers"""
+    if which in ('both', 'heavy'):
+        marker(img, 'enemy', 78, 128, 56, '24M', alpha)
+    if which in ('both', 'regular'):
+        for x, y, sz in ((168, 118, 24), (150, 176, 32), (206, 160, 26), (112, 196, 30)):
+            icon(img, 'enemydot', x, y, sz, alpha)
+
+
+def make_enemy_markers(m=None, which=None):
+    """the Enemy Markers option (m: its range) and its Enemy Markers For sub-options (which)"""
+    img = canvas()
+    ground(ImageDraw.Draw(img))
+    if m != 'off':
+        enemy_marks(img, which or 'both')
+    if which:
+        text = {'both': 'BOTH', 'heavy': 'HEAVY', 'regular': 'REGULAR'}[which]
+    else:
+        text = 'ENEMIES' if m is None else {'radar': 'RADAR', 'off': 'OFF'}.get(m, f'{m} M')
+    label(img, text, 18, 38 if (m is None or which) else 48)
+    return img
+
+
+def make_marker_opacity(group, pct=None):
+    """the markers of a group (loot, regular or heavy enemies) over a checkerboard at an opacity"""
+    img = canvas()
+    checker(img, (8, 8, S - 8, S - 8))
+    a = 0.5 if pct is None else pct / 100
+    if group == 'loot':
+        marker(img, 'medal', 82, 110, 64, '18M', a); marker(img, 'ammo', 170, 128, 64, '6M', a)
+    elif group == 'heavy':
+        marker(img, 'enemy', 128, 118, 84, '24M', a)
+    else:
+        for x, y, sz in ((80, 100, 40), (150, 86, 34), (176, 144, 44), (104, 150, 36)):
+            icon(img, 'enemydot', x, y, sz, a)
+    label(img, 'OPACITY' if pct is None else f'{pct}%', 196 if pct is None else 188, 36 if pct is None else 48)
     return img
 
 
@@ -216,7 +278,7 @@ def make_enemies(light):
     return img
 
 
-# ---- weapons, Still Radar and the keys
+# ---- weapons, Radar Animation and the keys
 def _weapon(uid):
     import weapon_textures as wt
     d = os.path.join(HERE, 'weapon_icons')
@@ -304,8 +366,18 @@ def all_images(kinds):
            'markers': make_markers(), 'range': make_range()}
     for pct in (100, 75, 50, 25, 0): out[f'opacity_{pct}'] = make_opacity(pct)
     for k in ('small', 'medium', 'large'): out[f'size_{k}'] = make_size(k)
+    out['iconsize'] = make_icon_size()
+    for pct in (100, 125, 150, 175, 200, 75, 50): out[f'iconsize_{pct}'] = make_icon_size(pct)
     for m in (5, 10, 15, 25, 50, 100, 200): out[f'markers_{m}'] = make_markers(m)
     for m in (75, 100, 150, 200, 250, 300): out[f'range_{m}'] = make_range(m)
+    # the world markers' opacity per group, and the enemy markers
+    for folder, group in (('markeropacity', 'loot'), ('regularopacity', 'regular'), ('heavyopacity', 'heavy')):
+        out[folder] = make_marker_opacity(group)
+        for pct in (100, 75, 50, 25): out[f'{folder}_{pct}'] = make_marker_opacity(group, pct)
+    out['enemymarkers'] = make_enemy_markers()
+    for m in ('off', 25, 50, 100, 150, 200, 'radar'): out[f'enemymarkers_{m}'] = make_enemy_markers(m)
+    out['enemymarks'] = make_enemy_markers(which='both')
+    for w in ('both', 'heavy', 'regular'): out[f'enemymarks_{w}'] = make_enemy_markers(which=w)
     for k in kinds: out[k] = make_kind(k)
     return out
 

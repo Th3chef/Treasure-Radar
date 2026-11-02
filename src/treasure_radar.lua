@@ -1,10 +1,11 @@
 -- HD2-Addon: mods/chef/treasure_radar
+-- HD2-Requires: chef-shared-loader
 -- Treasure Radar, a Chef Shared Loader addon.
 -- A round sonar radar just left of where the game's map opens (bottom right), with an icon for every pickup around me,
 -- a ledger of tiles counting what's left of each kind, and markers floating over the pickups near me. Optional: weapons
 -- on the ground (each with its own silhouette, picked one by one in the options menu), enemy structures, and on the
 -- radar only, inside its range: enemies (all, medium and heavy, or heavy only), SEAF troopers and civilians, and my
--- squadmates.
+-- squadmates; and world markers over the enemies near me (regular, heavy or both), each group at its own opacity.
 -- The settings are Arsenal options, and can be changed in game in the loader's options menu (F9).
 -- How: the loader lists my kinds' units every 3 s (spread over frames) and I draw everything with its screen drawing.
 -- Nothing Lua can read says the map is open, so the radar sits beside it, level with it, where neither covers the
@@ -14,7 +15,7 @@
 local chef = ...
 -- my log is treasure_radar.log next to the loader's; a loader without own_log keeps my lines in chef_loader.log
 if type(chef.own_log) == 'function' then chef.own_log('treasure_radar') end
-local M = { version = '0.7.1' }
+local M = { version = '0.7.2' }
 local floor, sqrt, max, min, atan2, exp, pi = math.floor, math.sqrt, math.max, math.min, math.atan2, math.exp, math.pi
 
 -- Fallback icons, 9 x 9 (X = the kind's color, o = dark outline, . = empty), for when the textures can't be used.
@@ -42,19 +43,19 @@ local CHECK = { '........X', '.......XX', '......XX.', 'X....XX..', 'XX..XX...',
 -- An enemy structure drops off once it looks destroyed (its meshes or its animation state, per kind below). Bile Titan
 -- holes aren't here: a closed one showed no change I can read.
 local KINDS = {
-  { id = 'credit', icon = 'coin', rgb = { 115, 233, 242 }, stack = 2, units = { 'bd6f4de16b9aedcd' } },
-  { id = 'medal', icon = 'star', rgb = { 255, 221, 31 }, stack = 2, units = { '773c4184e4bad0df' } },
-  { id = 'common', icon = 'vial', rgb = { 95, 220, 60 }, stack = 2,
+  { id = 'credit', icon = 'coin', rgb = { 115, 233, 242 }, top_ui = { 103, 153, 153 }, stack = 2, units = { 'bd6f4de16b9aedcd' } },
+  { id = 'medal', icon = 'star', rgb = { 250, 218, 90 }, top_ui = { 136, 153, 98 }, stack = 2, units = { '773c4184e4bad0df' } },
+  { id = 'common', icon = 'vial', rgb = { 85, 240, 150 }, top_ui = { 88, 153, 125 }, stack = 2,
     units = { '307e09e7698881ba', '294eda665270ac42', 'cf1ad44dedd1f257', '5016ee397fdcfb6c', '64b49b9d8a445266',
               '700e9500e95541bf', '86f3cb87d97942b4', '4efcb7e844be9e93', 'a2414ed6e129c19f', 'b39fcf5c73d5c383',
               'beb2a0f09e36bf72', 'd463836441cd0ba7', 'e4eeb96023df6a99' } },
-  { id = 'rare', icon = 'diamond', rgb = { 255, 190, 80 }, stack = 2,
+  { id = 'rare', icon = 'diamond', rgb = { 255, 148, 38 }, top_ui = { 136, 126, 64 }, stack = 2,
     units = { '8208ea6cb095be54', 'ad972a2e815a49aa', 'bd30758426ed2566', 'defe062c2567c23d' } },
-  { id = 'super', icon = 'crystal', rgb = { 255, 140, 220 }, stack = 2, units = { '9d4935fa69b6b41a', 'b4d6f2f83bde45a9' } },
-  { id = 'requisition', icon = 'slip', rgb = { 244, 247, 56 }, stack = 2, units = { 'da3c547d0e0e442f' } },
+  { id = 'super', icon = 'crystal', rgb = { 255, 105, 232 }, top_ui = { 136, 107, 153 }, stack = 2, units = { '9d4935fa69b6b41a', 'b4d6f2f83bde45a9' } },
+  { id = 'requisition', icon = 'slip', rgb = { 248, 240, 100 }, top_ui = { 136, 153, 103 }, stack = 2, units = { 'da3c547d0e0e442f' } },
   { id = 'ammo', icon = 'ammo', rgb = { 255, 234, 128 }, stack = 10, supply = true, units = { '79ccffd281e3f3a9' } },
-  { id = 'grenade', icon = 'grenade', rgb = { 135, 170, 45 }, stack = 10, supply = true, units = { '97af34fbf093409c' } },
-  { id = 'stim', icon = 'cross', rgb = { 60, 140, 255 }, stack = 10, supply = true, units = { 'b4ca4c5b922f7965' } },
+  { id = 'grenade', icon = 'grenade', rgb = { 0, 153, 0 }, top_ui = { 0, 128, 0 }, stack = 10, supply = true, units = { '97af34fbf093409c' } },
+  { id = 'stim', icon = 'cross', rgb = { 40, 94, 255 }, stack = 10, supply = true, units = { 'b4ca4c5b922f7965' } },
   -- Enemy Structures, in deep red. A destroyed bot fabricator stays in the world: its animation state goes to 3, then
   -- 4, and its 21 meshes swap from whole (1-4 and 17-21 show) to rubble (12-16 show). One destroyed before I joined
   -- arrives as rubble but its state never moves, so the hidden first mesh counts too (`dead_mesh`).
@@ -89,12 +90,13 @@ local KINDS = {
       ['5990123d142b16cb'] = 'MLS-4X Commando', ['e8d5f49ad7780e54'] = 'PLAS-45 Epoch', ['26e40437ea275296'] = 'RL-77 Airburst Rocket Launcher',
       ['2e9d0bdc48b09e60'] = 'RS-422 Railgun', ['3828e2051aa9e897'] = 'S-11 Speargun', ['cc786f6491fe7e65'] = 'StA-X3 W.A.S.P. Launcher',
       ['43b2d7766120203b'] = 'TX-41 Sterilizer', ['52071f49263415e4'] = 'SG-88 Break-Action Shotgun' } },
-  -- Enemies, in bright red, only inside the radar's range and never in the ledger or as world markers: the heavies
+  -- Enemies, in bright red, only inside the radar's range, never in the ledger, and as world markers only with the
+  -- Enemy markers option (which has its own range and lists the tiers it marks even when the radar doesn't): the heavies
   -- with the game's skull, the rest as the game's enemy dot (medium ones bigger). Each one's main body unit (its guns,
   -- arms, turrets, legs and packs are units of their own and left out, so nothing counts twice). Gun emplacements are
   -- left out too (harmless until an enemy mans one); the bunker turret fires on its own, so it's in. The Enemies option
   -- picks how many tiers show (`tier`: 3 heavy, 2 medium, 1 light); a tier not shown isn't listed at all. They move,
-  -- so I keep reading where they are while the radar shows (see foe_update), not only at each list.
+  -- so I keep reading where they are while the radar or the markers show them (see foe_update), not only at each list.
   { id = 'enemy', say = 'enemy', icon = 'skull', rgb = { 255, 70, 50 }, stack = 0, enemy = true,
     units = {
               '1a7fcdff98c664b0', '3aff5fd7d5450b99', '6b202392f4ab605e', '0ab7b92b131c228c', 'dcf8e74212fbee3b',
@@ -188,10 +190,58 @@ local TEXTURE_SIZES = {}
 --@@ICON_TEXTURES@@
 if chef.ui_textures then chef.ui_textures(TEXTURES_UI) end
 if chef.texture_sizes then chef.texture_sizes(TEXTURE_SIZES) end
+-- With HDR off the game's world pushes a color with a middling channel to the nearest pure one: orange lands on red or
+-- yellow. The top world is where the game draws its own HUD and it leaves each channel to itself, so a kind with a
+-- `top_ui` color draws there (`k.over`, its layer from M.lift), under the game's menus, in the same color the game's own
+-- icon has, and over everything of mine in the game's world. A screenshot makes that world look far brighter than it
+-- is, so judge it against the game's icons, never by the numbers. `k.ink` is the color its rects and numbers use. Below
+-- native the loader has moved everything to the top world on layers of its own, and a layer from chef.TOP + 1000 falls
+-- under my disc and tiles there, so `M.below` keeps it on its plain layers (build.py hands the texture to the loader as
+-- its own UI copy), and `top_ui` is what the loader's color conversion turns into `rgb`, as near as it can reach.
 for i, k in ipairs(KINDS) do
   k.texture = TEXTURES[k.id]; k.rank = i
   k.dot_tex = TEXTURES[k.dot or 'enemydot']       -- the small dot, in its own color (the tint is white)
   if k.enemy and not k.friendly then M.foe_kind = k elseif k.weapon then M.weapon_kind = k end
+  k.over = chef.TOP and k.top_ui and k.texture or nil
+  k.ink = k.rgb
+end
+function M.lift(k, layer) return k.over and not M.below and not M.low and chef.TOP + 1000 + layer or layer end
+-- (the loader's own test for below native, from the render size in the game's settings: it reads them at most every 90 s)
+function M.read_below(w, h)
+  local r = chef.setting and chef.setting('render_settings.render_resolution')
+  local s = type(r) == 'table' and tonumber(r[1]) and tonumber(r[2]) and w > 0 and h > 0 and min(r[1] / w, r[2] / h)
+  local below = s and s > 0.2 and s < 0.98 or false
+  if below == (M.below or false) then return end
+  M.below = below
+  chef.log('render size %s', below and 'below native' or 'native')
+  for _, k in ipairs(KINDS) do
+    if k.over then k.ink = below and k.top_ui or k.rgb end
+  end
+end
+-- With HDR on the game's UI Brightness setting scales the top world, about its 0.45 power on what shows. My colors are
+-- right at 336 (slider 11), so above that I tint them down to match. Below it a texture can't show brighter than full, so
+-- `M.low` puts them back in the game's world, which the setting doesn't touch and where HDR keeps a mixed color. Below
+-- native the loader converts tints and the game's world is cut short, so neither can do this there.
+M.UI_NITS, M.UI_POWER = 336.36, 0.45
+function M.read_dim()
+  local nits = chef.setting and chef.setting('render_settings.ui_brightness')
+  local on = chef.setting and chef.setting('render_settings.hdr_enabled') == true
+  local known = on and not M.below and type(nits) == 'number'
+  local dim = known and nits > M.UI_NITS + 1 and (M.UI_NITS / nits) ^ M.UI_POWER or 1
+  local low = known and nits < M.UI_NITS - 1 or false
+  if dim == (M.dim or 1) and low == (M.low or false) then return end
+  M.dim, M.low = dim, low
+  chef.log('UI brightness %s: the loot icons draw on %s, tinted to %d%%', tostring(nits), M.below and 'their plain layers' or
+    (low and 'the game\'s world' or 'the top world'), floor(dim * 100 + 0.5))
+end
+-- the tint for a kind's icon, and the color for its rects and numbers
+function M.icon_tint(k, a)
+  local v = k.over and floor(255 * (M.dim or 1) + 0.5) or 255
+  return chef.color(v, v, v, a)
+end
+function M.ink_color(k, a)
+  local d = k.over and (M.dim or 1) or 1
+  return chef.color(floor(k.ink[1] * d + 0.5), floor(k.ink[2] * d + 0.5), floor(k.ink[3] * d + 0.5), a)
 end
 local WEAPON_ASPECT = 128 / 48
 
@@ -222,6 +272,21 @@ local cfg = { radar = SHOW_RADAR, ledger = SHOW_LEDGER, scale = MAP_SCALE, rotat
               -- steps of half a percent of the screen's height
               pos = opt.position or 'map', nudge_x = 0, nudge_y = 0 }
 for _, k in ipairs(KINDS) do cfg.kinds[k.id] = kind_on(k.id) end
+-- World markers' opacity: the loot's (every kind but the enemies), the regular enemies' and the heavies'
+function M.op(v) return max(0.1, min(1, tonumber(v) or 1)) end
+cfg.mo_loot, cfg.mo_regular, cfg.mo_heavy = M.op(opt.marker_opacity), M.op(opt.regular_marker_opacity), M.op(opt.heavy_marker_opacity)
+-- Icon size: every icon on the radar, 50-200% (loot, supplies, weapons, enemies, friendlies; not my own arrow)
+cfg.icon_scale = max(0.5, min(2, tonumber(opt.icon_size) or 1))
+-- Enemy markers: their own range in meters ('radar': the radar's range; nil: off), and which ones get one (regular:
+-- light and medium; heavy: the skulls). They don't need the radar's Enemies: they list what they mark themselves.
+cfg.fm_range = opt.enemy_markers == 'radar' and 'radar' or tonumber(opt.enemy_markers)
+cfg.fm_regular, cfg.fm_heavy = opt.enemy_marks ~= 'heavy', opt.enemy_marks ~= 'regular'
+function M.fm_on() return cfg.fm_range ~= nil and (cfg.fm_regular or cfg.fm_heavy) end
+-- is an enemy of this tier wanted, on the radar (Enemies and Enemies shown) or as a world marker?
+function M.foe_wanted(t)
+  if cfg.kinds.enemy and t >= cfg.enemy_tier then return true end
+  return M.fm_on() and ((t == 3 and cfg.fm_heavy) or (t < 3 and cfg.fm_regular))
+end
 local ENDLESS = 10000                   -- World Markers at this range or more: no limit
 local function A(a) return floor(a * cfg.opacity + 0.5) end
 
@@ -429,11 +494,13 @@ local function apply_kinds()
   for u in pairs(watch_kinds) do watch_kinds[u] = nil end
   WEAPONS_ON = false
   for _, k in ipairs(KINDS) do
-    if cfg.kinds[k.id] then
+    local foe = k == M.foe_kind
+    if cfg.kinds[k.id] or (foe and M.fm_on()) then
       local n = 0
       for _, u in ipairs(k.units) do
-        -- a weapon the player switched off in the options menu, or an enemy below the tier shown, isn't listed at all
-        if not (k.weapon and cfg.weapons_off[u]) and not (k.enemy and not k.friendly and k.tier[u] < cfg.enemy_tier) then kind_of_unit[u] = k; watch_kinds[u] = true; n = n + 1 end
+        -- a weapon the player switched off in the options menu, or an enemy neither the radar nor the enemy markers
+        -- want, isn't listed at all
+        if not (k.weapon and cfg.weapons_off[u]) and not (foe and not M.foe_wanted(k.tier[u])) then kind_of_unit[u] = k; watch_kinds[u] = true; n = n + 1 end
       end
       if n > 0 then
         active[#active + 1] = k
@@ -457,6 +524,8 @@ end
 
 local watch = nil
 local mission_id = 0
+-- the kinds listed again (after an options menu change to what's listed), at once
+function M.relist() apply_kinds(); if watch then watch.refresh() end end
 
 -- ------------------------------------------------------------------ the loader's options menu (F9)
 -- Every setting again in the menu, when the loader has one. Each row starts at the Arsenal pick; a change applies at
@@ -467,7 +536,7 @@ do
     chef.title('Treasure Radar')
     local function said(what, v) if not cfg.zooming then chef.log('menu: %s %s', what, tostring(v)) end end
     -- The rows in groups under headings (subheadings indent theirs), and a hint on the less obvious rows. Only loaders
-    -- that draw headings get them (1.4.0 and newer); older ones show the same rows in the same order, without.
+    -- that draw headings get them; older ones show the same rows in the same order, without.
     M.DECO = chef.has and chef.has('option_headings') and {
       radar = { heading = 'Radar' },
       position = { heading = 'Placement', sub = true,
@@ -477,9 +546,15 @@ do
       range = { heading = 'View', sub = true, hint = 'How far out the radar shows. The zoom keys change it too.' },
       rotate = { hint = 'The radar turns with you: the way you look is always up, and N, E, S and W move around the rim.' },
       opacity = { hint = "How solid the radar's panel and sweep and the ledger's tiles are. The icons and counts stay solid." },
+      icon_size = { hint = 'How big the icons on the radar are: loot, supplies, weapons, enemies and friendlies.' },
       animation = { hint = 'The sweep that turns every 3 seconds and lights each pickup up as it passes. Off: a still radar.' },
       world_markers = { heading = 'World markers',
         hint = "Each pickup's icon floats over it in the world, with how far it is, within the range you pick." },
+      marker_opacity = { hint = 'How solid the markers over the loot, supplies, enemy structures and weapons are.' },
+      enemy_markers = { heading = 'Enemy markers', sub = true,
+        hint = 'A marker over each enemy within this range: heavies as the skull with how far they are, the rest as the dot. The world markers key hides or shows them too.' },
+      enemy_marks_regular = { hint = 'The light and medium ones (Warriors, Hunters, Troopers, Devastators, Voteless and the like).' },
+      enemy_marks_heavy = { hint = 'Chargers, Impalers, Bile Titans, Hulks, Tanks, Striders, Harvesters and the like.' },
       kind_credit = { heading = 'Loot' },
       kind_common = { heading = 'Samples', sub = true },
       kind_ammo = { heading = 'Supplies', sub = true },
@@ -534,10 +609,35 @@ do
                                                          default = floor(cfg.opacity * 100 + 0.5) }))
     if type(op) == 'number' then cfg.opacity = op / 100 end
     chef.on_change('opacity', function(x) cfg.opacity = x / 100; said('opacity', x) end)
+    local ic = chef.option('icon_size', M.dress('icon_size', { type = 'slider', label = 'Icon size (%)', min = 50, max = 200, step = 5,
+                                                               default = floor(cfg.icon_scale * 100 + 0.5) }))
+    if type(ic) == 'number' then cfg.icon_scale = ic / 100 end
+    chef.on_change('icon_size', function(x) cfg.icon_scale = x / 100; said('Icon size', x) end)
     toggle('animation', 'Radar animation', not cfg.still, function(v) cfg.still = not v end)
     -- (a choice is saved by its place in the list, so this row's values never change order)
     choice('world_markers', 'World markers', { 'Off', '5 M', '10 M', '15 M', '25 M', '50 M', '100 M', '200 M', 'Endless' },
       { false, 5, 10, 15, 25, 50, 100, 200, ENDLESS * 10 }, cfg.markers or false, function(v) cfg.markers = v or nil end)
+    -- each marker group's opacity, 10-100%
+    local function mo_row(id, label, field)
+      local v = chef.option(id, M.dress(id, { type = 'slider', label = label, min = 10, max = 100, step = 5,
+                                              default = floor(cfg[field] * 100 + 0.5) }))
+      if type(v) == 'number' then cfg[field] = M.op(v / 100) end
+      chef.on_change(id, function(x) cfg[field] = M.op(x / 100); said(label, x) end)
+    end
+    mo_row('marker_opacity', 'Marker opacity (%)', 'mo_loot')
+    -- the enemy markers: a change to these changes which enemies are listed
+    choice('enemy_markers', 'Enemy markers', { 'Off', '25 M', '50 M', '100 M', '150 M', '200 M', 'Radar range' },
+      { false, 25, 50, 100, 150, 200, 'radar' }, cfg.fm_range or false, function(v)
+        if cfg.fm_range ~= (v or nil) then cfg.fm_range = v or nil; M.relist() end
+      end)
+    toggle('enemy_marks_regular', 'Mark regular enemies', cfg.fm_regular, function(v)
+      if cfg.fm_regular ~= v then cfg.fm_regular = v; M.relist() end
+    end)
+    toggle('enemy_marks_heavy', 'Mark heavy enemies', cfg.fm_heavy, function(v)
+      if cfg.fm_heavy ~= v then cfg.fm_heavy = v; M.relist() end
+    end)
+    mo_row('regular_marker_opacity', 'Regular enemy opacity (%)', 'mo_regular')
+    mo_row('heavy_marker_opacity', 'Heavy enemy opacity (%)', 'mo_heavy')
     -- The rows in groups, top to bottom: the look (above), then what shows (loot in ledger order, supplies, enemies,
     -- enemy structures, friendlies), then the keys, and the weapons last, as they bring a row for every weapon. Arsenal
     -- lists its options in the same order.
@@ -620,10 +720,14 @@ end
 local function log_settings(from)
   local n = 0
   for _, on in pairs(cfg.kinds) do if on then n = n + 1 end end
-  chef.log('%s: kinds on %d of %d | radar %s (size %.2f%s%s) | ledger %s | range %d m | opacity %d%% | world markers %s', from, n, #KINDS,
-    tostring(cfg.radar), cfg.scale, cfg.rotate and ', turning with my view' or '', cfg.still and ', still' or '',
+  chef.log('%s: kinds on %d of %d | radar %s (size %.2f, icons %d%%%s%s) | ledger %s | range %d m | opacity %d%% | world markers %s', from, n, #KINDS,
+    tostring(cfg.radar), cfg.scale, floor(cfg.icon_scale * 100 + 0.5), cfg.rotate and ', turning with my view' or '', cfg.still and ', still' or '',
     tostring(cfg.ledger), range_now, floor(cfg.opacity * 100 + 0.5),
     cfg.markers and (cfg.markers >= ENDLESS and 'endless' or (cfg.markers .. ' m')) or 'off')
+  local r = cfg.fm_range
+  chef.log('enemy markers %s (regular %s, heavy %s) | marker opacity: loot %d%%, regular enemies %d%%, heavy enemies %d%%',
+    r == 'radar' and "at the radar's range" or (r and r .. ' m' or 'off'), cfg.fm_regular and 'on' or 'off', cfg.fm_heavy and 'on' or 'off',
+    floor(cfg.mo_loot * 100 + 0.5), floor(cfg.mo_regular * 100 + 0.5), floor(cfg.mo_heavy * 100 + 0.5))
   local off = {}
   for u in pairs(cfg.weapons_off) do off[#off + 1] = M.weapon_kind.names[u] or u end
   if #off > 0 then table.sort(off); chef.log('weapons switched off (%d): %s', #off, table.concat(off, ', ')) end
@@ -711,7 +815,7 @@ local function rebuild(items)
       if d2 and d2 < near then near, M.me = d2, it.unit end
     end
   end
-  local divers, n_carried, n_spent, n_bodies = {}, 0, 0, 0
+  local divers = {}
   -- the enemies: their own list (not in the piles, the ledger or the markers), keeping where each was last seen
   local old_hv, hv = {}, {}
   for _, h in ipairs(M.foes) do if not h.gone then old_hv[h.unit] = h end end
@@ -720,22 +824,19 @@ local function rebuild(items)
       if CARRIERS[it.kind] then
         local live = chef.call_kind('Unit.has_animation_state_machine', 'c' .. it.kind, it.unit) == true
         divers[#divers + 1] = { x = it.x, y = it.y, z = it.z, live = live }
-        if not live then n_bodies = n_bodies + 1 end
       end
     end
   end
   for _, it in ipairs(items) do
     local k = kind_of_unit[it.kind]
     if k and k.weapon and spent(it) then
-      n_spent = n_spent + 1
       k = nil
     elseif k and k.weapon and carried(it, divers) then
-      n_carried = n_carried + 1
       k = nil
     end
     if k and k.enemy then
       if not M.foe_dead[it.unit] and it.unit ~= M.me then
-        hv[#hv + 1] = old_hv[it.unit] or { unit = it.unit, uk = it.kind, k = k, x = it.x, y = it.y, tier = k.tier[it.kind] or 1 }
+        hv[#hv + 1] = old_hv[it.unit] or { unit = it.unit, uk = it.kind, k = k, x = it.x, y = it.y, z = it.z, tier = k.tier[it.kind] or 1 }
       end
       k = nil
     end
@@ -791,10 +892,7 @@ local function moved(u, p)
   local x, y, z = chef.call('Vector3.to_elements', v)
   if type(x) ~= 'number' then return false end
   local d2 = (x - at.x) ^ 2 + (y - at.y) ^ 2 + (z - (at.z or 0)) ^ 2
-  if d2 > 0.25 then
-    return true
-  end
-  return false
+  return d2 > 0.25
 end
 
 -- A picked-up pickup drops out at once (from its marker, its radar pile and the ledger), without waiting for the next
@@ -820,9 +918,10 @@ local function check_alive(cam)
   end
 end
 
--- The enemies move, so while the radar shows I keep reading where they are: each one inside the radar's range (and
--- FOE.NEAR meters past it) every FOE.EVERY_NEAR seconds, the rest every FOE.EVERY_FAR, at most FOE.BUDGET reads a
--- frame. Each is checked alive first: asking a removed unit's position crashes the game. One that's gone drops off.
+-- The enemies move, so while the radar or the enemy markers show them I keep reading where they are: each one within
+-- `reach` meters (the radar's range, or the enemy markers' if farther) and FOE.NEAR past it every FOE.EVERY_NEAR
+-- seconds, the rest every FOE.EVERY_FAR, at most FOE.BUDGET reads a frame, and only those on show (M.foe_shown). Each is
+-- checked alive first: asking a removed unit's position crashes the game. One that's gone drops off.
 -- A killed enemy's body stays in the world, but its animation state machine goes away (a Hulk goes to state 12, then
 -- has none). So once a kind of enemy has been seen with a state machine, one without is a body: it drops off and stays
 -- off for the mission. A kind never seen with one stays shown (a live enemy is never hidden on a guess).
@@ -874,33 +973,169 @@ function M.combo(s1, s2, s3, s4)
   if not (ok(s1) and ok(s2) and ok(s3) and ok(s4)) then return nil end
   return -1 - (s1 + s2 * 1024 + s3 * 1048576 + s4 * 1073741824)
 end
--- a layer state as I log it: "state 60", "layer 3 at 197" or "layers 4/10/1/1"
-function M.say_state(k)
-  if k < 0 then
-    local c, s = -1 - k, {}
-    for i = 1, 4 do s[i] = c % 1024; c = floor(c / 1024) end
-    return 'layers ' .. table.concat(s, '/')
-  end
-  if k < M.LAYER then return 'state ' .. k end
-  return string.format('layer %d at %d', floor(k / M.LAYER), k % M.LAYER)
-end
 local DEATH_SEEN = 2
 -- Wrecks: a destroyed tank stays in the world with its state machine, settled in state 0 for good (every tank turret
 -- rides the same hull). One that was in another state before is a wreck while it's in that state; one that's in it
 -- from the start may be a live tank waiting, so it stays shown.
 M.foe_wreck = { ['00bcf8247a544cdc'] = 0 }
 M.learned = 0       -- death states learned this game session (for the mission summary)
-local function foe_update(cam)
+-- Bodies: an enemy that dies goes into an animation state with no end: layer 1's length (the second answer of
+-- Unit.animation_layer_info) jumps to about 1e37 as it dies and stays there until its state machine goes, about 10 s
+-- later, where the living play clips with a length. One call, asked every M.ending.EVERY seconds, so every enemy gets it,
+-- friendlies not: a Helldiver ragdolls alive. A kind can live in such a state too (Watchers), so one already in it when
+-- I first read it isn't judged until it has left it. One that leaves it alive, or stays in it past M.ending.MAX seconds,
+-- shows its kind uses it alive: it shows again and that kind isn't judged again. Fleshmobs are known to: a live one
+-- stands in such a state on layer 2 and gets up from one on layer 1.
+M.ending = { LONG = 1e30, EVERY = 0.3, MAX = 20, live = { ['67dc32dca4f02d33'] = true } }
+function M.ending.alive(h, why)
+  M.ending.live[h.uk] = true
+  h.ended = false
+  h.body = h.rested
+end
+function M.ending.check(h, now, key)
+  local E = M.ending
+  if now < (h.end_at or 0) then return end
+  h.end_at = now + E.EVERY
+  if E.live[h.uk] then
+    if h.ended then h.ended = false; h.body = h.rested end
+    return
+  end
+  local _, len = chef.call_kind('Unit.animation_layer_info', key, h.unit, 1)
+  if type(len) ~= 'number' then return end
+  local long = len >= E.LONG
+  if h.end0 == nil then
+    h.end0 = long
+  end
+  if not long then
+    if h.ended then E.alive(h, 'left its no-end state alive') end
+    h.end0 = false
+  elseif not h.end0 then
+    if not h.ended then h.ended, h.body, h.bt = true, true, h.bt or now
+    elseif now - (h.bt or now) > E.MAX then E.alive(h, 'stayed in its no-end state too long') end
+  end
+end
+-- The kinds the layers can't tell, by their bones, few enough to be cheap. All node reads are relative to the root.
+function M.node_list(h, n, d)
+  local key = h.uk .. n .. d
+  local l = M.node_lists[key]
+  if not l then
+    l = {}
+    M.node_lists[key] = l
+    local c = tonumber((chef.call_kind('Unit.num_scene_graph_items', 'g' .. h.uk, h.unit))) or 0
+    for i = 1, n do
+      local k = floor(c * i / d)
+      if k > 1 then l[#l + 1] = k end
+    end
+  end
+  return l
+end
+M.node_lists = {}
+function M.node_at(h, n)
+  local p = chef.call_kind('Unit.world_position', 'g' .. h.uk, h.unit, n)
+  if p == nil then return nil end
+  local x, y, z = chef.call('Vector3.to_elements', p)
+  if type(x) ~= 'number' then return nil end
+  return x - h.x, y - h.y, z - h.z
+end
+function M.top_of(h, list)
+  local top
+  for _, n in ipairs(list) do
+    local _, _, z = M.node_at(h, n)
+    if z and (not top or z > top) then top = z end
+  end
+  return top
+end
+-- Fleshmobs: a live one keeps moving, even standing or getting up, and a body stops. A moving enemy can't be a body, so the
+-- root (which I read anyway) comes first: every M.still.EVERY seconds, only with the root stopped, I read M.still.NODES
+-- nodes. Under M.still.RATE m/s with the root under M.still.ROOT m/s for M.still.HOLD seconds, once I've seen it move, is a
+-- body. If its root then goes M.still.AWAKE meters from where it lay, it shows again.
+M.still = { KINDS = { ['67dc32dca4f02d33'] = true }, NODES = 3, EVERY = 0.5, RATE = 0.2, ROOT = 0.05, HOLD = 1, AWAKE = 2 }
+function M.still.pose(h, b)
+  local list = M.node_list(h, M.still.NODES, M.still.NODES + 1)
+  local moved, got, had = 0, 0, b.seen
+  for i, n in ipairs(list) do
+    local x, y, z = M.node_at(h, n)
+    if x then
+      got = got + 1
+      if had and b.px[i] then moved = moved + sqrt((x - b.px[i]) ^ 2 + (y - b.py[i]) ^ 2 + (z - b.pz[i]) ^ 2) end
+      b.px[i], b.py[i], b.pz[i] = x, y, z
+    end
+  end
+  if got == 0 then return nil end
+  b.seen = true
+  return had and moved or nil
+end
+function M.still.track(h, now)
+  local S, b = M.still, h.bd
+  if not b then
+    h.bd = { px = {}, py = {}, pz = {}, at = now + S.EVERY, t = now, x = h.x, y = h.y, z = h.z }
+    return
+  end
+  if now < b.at then return end
+  local dt = now - b.t
+  local rm = sqrt((h.x - b.x) ^ 2 + (h.y - b.y) ^ 2 + (h.z - b.z) ^ 2)
+  b.at, b.t, b.x, b.y, b.z = now + S.EVERY, now, h.x, h.y, h.z
+  if rm >= S.ROOT * dt then
+    b.woke, b.q, b.seen = true, nil, false
+  else
+    local moved = S.pose(h, b)
+    if moved and moved < S.RATE * dt then
+      b.q = b.q or now - dt
+      if b.woke and not h.rested and now - b.q >= S.HOLD then
+        h.rested, h.body, h.bt = true, true, h.bt or now
+        b.rx, b.ry, b.rz = h.x, h.y, h.z
+      end
+    elseif moved then
+      b.q, b.woke = nil, true
+    end
+  end
+  if h.rested and (h.x - b.rx) ^ 2 + (h.y - b.ry) ^ 2 + (h.z - b.rz) ^ 2 > S.AWAKE ^ 2 then
+    h.rested, h.body = false, h.ended
+    if not h.ended then h.bt = nil end
+  end
+end
+-- Harvesters: nothing in their layers changes as they die, but as one collapses its top node goes from about 9 m to over
+-- 10 m above its root (above the root, not the ground: this says nothing about how high the body is). M.tall.LOOKS looks
+-- in a row at or over that is a body, and it stays one: a dying one's top node swings back under as it falls, and only the
+-- dead ragdoll. A look under M.tall.BACK starts the count over.
+M.tall = { KINDS = { ['965eae5a51acdd4a'] = 10 }, NODES = 8, EVERY = 0.5, LOOKS = 2, BACK = 9.8 }
+function M.tall.check(h, now)
+  local T = M.tall
+  if now < (h.tall_at or 0) then return end
+  h.tall_at = now + T.EVERY
+  local top = M.top_of(h, M.node_list(h, T.NODES, T.NODES))
+  if not top then return end
+  if top >= T.KINDS[h.uk] then
+    h.tall_n = (h.tall_n or 0) + 1
+    if h.tall_n >= T.LOOKS and not h.rested then
+      h.rested, h.body, h.bt = true, true, h.bt or now
+    end
+  elseif top < T.BACK then
+    h.tall_n = 0
+  end
+end
+-- The enemy markers float over a heavy's head: each kind's top node is measured the first time I read one.
+M.mark_top = {}
+function M.measure(h)
+  local top = M.top_of(h, M.node_list(h, 8, 8))
+  M.mark_top[h.uk] = top and max(3.5, min(16, top + 0.6)) or 3.5
+end
+function M.bones(h, now, near)
+  if M.still.KINDS[h.uk] then M.still.track(h, now)
+  elseif near and M.tall.KINDS[h.uk] then M.tall.check(h, now) end
+  if h.tier == 3 and not h.k.friendly and not M.mark_top[h.uk] and M.fm_on() and cfg.fm_heavy then M.measure(h) end
+end
+local function foe_update(cam, reach)
   local fs = M.foes
   local n = #fs
   if n == 0 then return end
   local now = chef.time()
-  local near2 = (range_now + FOE.NEAR) ^ 2
+  local near2 = (reach + FOE.NEAR) ^ 2
   local reads = 0
   for _ = 1, n do
     M.foe_i = M.foe_i % n + 1
     local h = fs[M.foe_i]
-    if not h.gone and (h.next or 0) <= now then
+    if not h.gone and (h.next or 0) <= now and M.foe_shown(h) then
       reads = reads + 1
       local key = 'h' .. h.uk
       local alive = chef.call_kind('Unit.alive', key, h.unit) == true
@@ -916,7 +1151,6 @@ local function foe_update(cam)
           if not ls then ls, lf, lt = {}, {}, {}; h.ls, h.lf, h.lt = ls, lf, lt end
           local wk = M.foe_wreck[h.uk]
           local ds, lv = M.foe_death[h.uk], M.foe_live[h.uk]
-          local was = h.dying
           h.dying = false
           for l = 1, 5 do
             local s = lay[l]
@@ -949,6 +1183,7 @@ local function foe_update(cam)
             lv[h.dying] = true
             h.dying, h.dk = false, nil
           end
+          if not h.k.friendly then M.ending.check(h, now, key) end
         elseif M.foe_asm[h.uk] then
           alive = false
           M.foe_dead[h.unit] = true
@@ -956,7 +1191,7 @@ local function foe_update(cam)
           -- it went into in its last 30 s: a body lies at most about 20 s, and one it held longer is a live one.
           -- (Nothing to learn from one already hidden while dying.)
           local ls, lf, lt, lv = h.ls, h.lf, h.lt, M.foe_live[h.uk]
-          for l = 1, (ls and not h.dying) and 5 or 0 do
+          for l = 1, (ls and not h.dying and not h.body) and 5 or 0 do
             local k = ls[l]
             -- (a layer at 0 never, the first one included: that's where the idle stand)
             if k and not (k >= 0 and k % M.LAYER == 0) and k ~= lf[l] and not (lv and lv[k]) and now - (lt[l] or now) <= 30 then
@@ -974,8 +1209,10 @@ local function foe_update(cam)
       local x, y, z
       if v then x, y, z = chef.call('Vector3.to_elements', v) end
       if type(x) == 'number' then h.x, h.y, h.z = x, y, z else h.gone = true end
+      local near = ((h.x or 0) - cam.x) ^ 2 + ((h.y or 0) - cam.y) ^ 2 <= near2
+      if alive and not h.gone and h.ls then M.bones(h, now, near) end
       -- read again soon if it's on the radar or close to its edge, else in a while
-      h.next = now + (((h.x or 0) - cam.x) ^ 2 + ((h.y or 0) - cam.y) ^ 2 <= near2 and FOE.EVERY_NEAR or FOE.EVERY_FAR)
+      h.next = now + (near and FOE.EVERY_NEAR or FOE.EVERY_FAR)
       if reads >= FOE.BUDGET then break end
     end
   end
@@ -991,7 +1228,7 @@ local function palette(k)
   if not p then p = { frame = -1 }; pals[k] = p end
   if p.frame ~= frame_no then
     p.frame = frame_no
-    p.X, p.back, p.tint = chef.color(k.rgb[1], k.rgb[2], k.rgb[3], 255), chef.color(10, 10, 12, 200), chef.color(255, 255, 255, 255)
+    p.X, p.back, p.tint = M.ink_color(k, 255), chef.color(10, 10, 12, 200), M.icon_tint(k, 255)
   end
   return p
 end
@@ -1029,7 +1266,12 @@ local function btext(x, y, str, size, c, layer)
       else
         local e = g[ch]
         local w = e[2] * cap
-        if not chef.bitmap(e[1], cx - pad, y - pad, w + 2 * pad, cap + 2 * pad, c, layer) then
+        local drew = chef.bitmap(e[1], cx - pad, y - pad, w + 2 * pad, cap + 2 * pad, c, layer)
+        -- (the top world can be away for a moment, which says nothing about my textures)
+        if not drew and chef.TOP and layer >= chef.TOP then
+          drew = chef.bitmap(e[1], cx - pad, y - pad, w + 2 * pad, cap + 2 * pad, c, layer - chef.TOP - 1000)
+        end
+        if not drew then
           glyph_ok = false
           chef.log('glyph textures not usable; numbers use the pixel font')
           break
@@ -1099,7 +1341,7 @@ local function draw_radar(px, cam, cx, cy, R)
       dx, dy = turn(dx, dy)
       -- every kind's icon about the same size, bigger near me and smaller far off (so the zoom changes it):
       -- 1.3x at my feet down to 0.7x at the range; on the edge (beyond the range) 0.6x
-      local cell = max(1, px * (edge and 0.6 or (1.3 - 0.6 * min(1, d / range_now))))
+      local cell = max(1, px * cfg.icon_scale * (edge and 0.6 or (1.3 - 0.6 * min(1, d / range_now))))
       local half = 5.5 * cell
       local sx, sy = cx + dx * scale, cy + dy * scale
       local skip = false
@@ -1116,7 +1358,8 @@ local function draw_radar(px, cam, cx, cy, R)
       end
       if not skip then
         local pal = palette(k)
-        -- layers: supplies at the bottom, then the loot, then the weapons on top (counts above all of them)
+        -- layers: supplies at the bottom, then the loot, then the weapons on top (counts above all of them); a kind in
+        -- the top world sits over all of these and the enemies
         local z = k.weapon and 925 or (k.supply and 910 or (k.structure and 915 or 920))
         local tint = pal.tint
         if sweep then
@@ -1126,7 +1369,8 @@ local function draw_radar(px, cam, cx, cy, R)
             chef.bitmap(TEXTURES.glow, sx - g, sy - g, 2 * g, 2 * g, chef.color(GLOW[1], GLOW[2], GLOW[3], floor(150 * pulse)), z - 1)
           end
           half = half * (1 + 0.12 * pulse)
-          tint = chef.color(255, 255, 255, floor(255 * (0.72 + 0.28 * pulse)))
+          -- (a kind in the top world stays solid: see-through its color goes dull there, as the disc under it is in another world)
+          if not k.over or M.low then tint = chef.color(255, 255, 255, floor(255 * (0.72 + 0.28 * pulse))) end
         end
         local tex, hw = k.texture, half
         if k.weapon then
@@ -1135,36 +1379,37 @@ local function draw_radar(px, cam, cx, cy, R)
           hw = half * 0.75 * WEAPON_ASPECT
           half = half * 0.75
         end
-        if not (tex and chef.bitmap(tex, sx - hw, sy - half, 2 * hw, 2 * half, tint, z)) then
+        if not (tex and chef.bitmap(tex, sx - hw, sy - half, 2 * hw, 2 * half, tint, M.lift(k, z))) then
           half = 4.5 * cell; hw = half
           chef.rect(sx - half, sy - half, 9 * cell, 9 * cell, pal.back, z)
           chef.sprite(sx - half, sy - half, ICON[k.icon], cell, pal, z + 1)
         end
-        if s.n > 1 and not edge then btext(sx + hw + px, sy - 3 * px / 2, tostring(s.n), small, pal.X, 930) end
+        if s.n > 1 and not edge then btext(sx + hw + px, sy - 3 * px / 2, tostring(s.n), small, pal.X, M.lift(k, 930)) end
       end
     end
   end
   -- the enemies and SEAF troopers, over the pickups, only inside the range (no edge markers for them): heavies as the
-  -- skull, the rest as the dot (medium ones and troopers bigger), drawn after the dots so the skulls sit on top
+  -- skull, the rest as the dot (medium ones and troopers bigger), drawn after the dots so the skulls sit on top. (The
+  -- enemy markers can list enemies the radar doesn't show: the Enemies shown tier picks the radar's.)
   if #M.foes > 0 and (cfg.kinds.enemy or cfg.kinds.friend or cfg.kinds.squad) then
     local r2 = range_now * range_now
     for pass = 1, 2 do
       for _, h in ipairs(M.foes) do
         local fk = h.k
-        if not h.gone and not h.dying and cfg.kinds[fk.id] and (h.tier == 3) == (pass == 2) then
+        if not h.gone and not h.dying and not h.body and cfg.kinds[fk.id] and (fk.friendly or h.tier >= cfg.enemy_tier) and (h.tier == 3) == (pass == 2) then
           local pal = palette(fk)
           local dx, dy = h.x - cam.x, h.y - cam.y
           if dx * dx + dy * dy <= r2 then
             dx, dy = turn(dx, dy)
             local sx, sy = cx + dx * scale, cy + dy * scale
-            local half = (h.tier == 3 and 5.5) or (h.tier == 2 and 2.6) or 1.8
-            half = half * px
+            local ip = px * cfg.icon_scale
+            local half = ((h.tier == 3 and 5.5) or (h.tier == 2 and 2.6) or 1.8) * ip
             -- the dot textures carry their color (the tint is white): red enemies, blue SEAF and civilians, green squad
             local tex = h.tier == 3 and fk.texture or fk.dot_tex
             if not (tex and chef.bitmap(tex, sx - half, sy - half, 2 * half, 2 * half, pal.tint, 926 + pass)) then
               if h.tier == 3 then
-                chef.rect(sx - 4.5 * px, sy - 4.5 * px, 9 * px, 9 * px, pal.back, 927)
-                chef.sprite(sx - 4.5 * px, sy - 4.5 * px, ICON[fk.icon], px, pal, 928)
+                chef.rect(sx - 4.5 * ip, sy - 4.5 * ip, 9 * ip, 9 * ip, pal.back, 927)
+                chef.sprite(sx - 4.5 * ip, sy - 4.5 * ip, ICON[fk.icon], ip, pal, 928)
               else
                 chef.rect(sx - half, sy - half, 2 * half, 2 * half, pal.X, 926)
               end
@@ -1238,9 +1483,10 @@ local function draw_ledger(px, edge_x, bottom, left)
           chef.rect(x, y, tw_, th, done and fill_done or fill, 900)
         end
       end
-      chef.rect(x + 1.2 * px, y + th - line, tw_ - 2.4 * px, line, done and gray or chef.color(k.rgb[1], k.rgb[2], k.rgb[3], A(230)), 902)
+      chef.rect(x + 1.2 * px, y + th - line, tw_ - 2.4 * px, line, done and gray or M.ink_color(k, A(230)),
+        done and 902 or M.lift(k, 902))
       local ix, iy = x + (tw_ - isz) / 2, y + th - 2.2 * px - isz
-      if not (k.texture and chef.bitmap(k.texture, ix, iy, isz, isz, done and dim_icon or pal.tint, 910)) then
+      if not (k.texture and chef.bitmap(k.texture, ix, iy, isz, isz, done and dim_icon or pal.tint, M.lift(k, 910))) then
         chef.rect(ix, iy, isz, isz, pal.back, 909)
         chef.sprite(ix + (isz - 9 * px * 0.9) / 2, iy + (isz - 9 * px * 0.9) / 2, ICON[k.icon], px * 0.9, pal, 910)
       end
@@ -1259,12 +1505,70 @@ local function draw_ledger(px, edge_x, bottom, left)
 end
 
 -- ------------------------------------------------------------------ world markers
--- Each pile's icon over it in the world within cfg.markers meters, with how far it is and, for a pile, how many.
--- Placed through my view camera (the loader's world_to_screen). The Markers Key hides or shows them.
+-- Each pile's icon over it in the world within cfg.markers meters, with how far it is and, for a pile, how many; and
+-- each enemy within the enemy markers' range. Placed through my view camera (the loader's world_to_screen). The
+-- Markers Key hides or shows them all.
+-- A kind's marker colors at an opacity, made once a frame (the enemies' twice: `slot` 'mr' regular, 'mh' heavy).
+function M.mark_pal(k, op, slot)
+  local p = palette(k)
+  if op >= 1 then return p end
+  local c = p[slot]
+  if not c then c = {}; p[slot] = c end
+  if c.frame ~= frame_no then
+    local a = floor(255 * op + 0.5)
+    c.frame = frame_no
+    c.X, c.tint = M.ink_color(k, a), M.icon_tint(k, a)
+  end
+  return c
+end
+-- how far out the enemies' places are read often: the radar's range while it shows them, the enemy markers' while
+-- they're up, whichever is farther (0: neither, so they aren't read at all)
+function M.foe_reach()
+  local r = 0
+  if markers_on and M.fm_on() then r = cfg.fm_range == 'radar' and range_now or cfg.fm_range end
+  if cfg.radar and not hidden and (cfg.kinds.enemy or cfg.kinds.friend or cfg.kinds.squad) then r = max(r, range_now) end
+  return r
+end
+-- is this one on show at all right now? What neither the radar nor the enemy markers draw isn't read
+function M.foe_shown(h)
+  local k = h.k
+  if cfg.radar and not hidden and cfg.kinds[k.id] and (k.friendly or h.tier >= cfg.enemy_tier) then return true end
+  return not k.friendly and markers_on and M.fm_on() and ((h.tier == 3 and cfg.fm_heavy) or (h.tier < 3 and cfg.fm_regular)) or false
+end
+-- the enemy markers: a heavy as the skull with how far it is, the rest as the dot (no distance: there can be dozens),
+-- the skull higher up (heavies are tall)
+function M.draw_foe_marks(px, cam, w, h, small, my_z)
+  local fr = cfg.fm_range == 'radar' and range_now or cfg.fm_range
+  local f2 = fr * fr
+  for _, e in ipairs(M.foes) do
+    local fk, heavy = e.k, e.tier == 3
+    if not e.gone and not e.dying and not e.body and e.z and not fk.friendly and ((heavy and cfg.fm_heavy) or (not heavy and cfg.fm_regular)) then
+      local dx, dy, dz = e.x - cam.x, e.y - cam.y, e.z - my_z
+      local d2 = dx * dx + dy * dy + dz * dz
+      if d2 <= f2 then
+        local sx, sy = chef.world_to_screen(e.x, e.y, e.z + (heavy and (M.mark_top[e.uk] or 3.5) or 2.2))
+        if sx and sx > 0 and sx < w and sy > 0 and sy < h then
+          local pal = M.mark_pal(fk, heavy and cfg.mo_heavy or cfg.mo_regular, heavy and 'mh' or 'mr')
+          local half = (heavy and 4.1 or (e.tier == 2 and 2.6 or 2.0)) * px
+          local tex, zl = heavy and fk.texture or fk.dot_tex, heavy and 878 or 876
+          if not (tex and chef.bitmap(tex, sx - half, sy - half, 2 * half, 2 * half, pal.tint, zl)) then
+            chef.rect(sx - half, sy - half, 2 * half, 2 * half, pal.X, zl)
+          end
+          if heavy then
+            local t = dist_text(sqrt(d2))
+            btext(sx - tw(t, small) / 2, sy - half - 8 * small, t, small, pal.X, 885)
+          end
+        end
+      end
+    end
+  end
+end
 local function draw_markers(px, cam, w, h)
-  if not (cfg.markers and markers_on and chef.world_to_screen) then return end
+  if not (markers_on and chef.world_to_screen) then return end
   local small = max(1, floor(px * 2 / 3))
   local my_z = cam.z - EYE
+  if M.fm_on() and #M.foes > 0 then M.draw_foe_marks(px, cam, w, h, small, my_z) end
+  if not cfg.markers then return end
   local r2 = cfg.markers >= ENDLESS and math.huge or cfg.markers * cfg.markers
   for _, p in ipairs(pickups) do
     local dx, dy, dz = p.x - cam.x, p.y - cam.y, p.z - my_z
@@ -1276,20 +1580,20 @@ local function draw_markers(px, cam, w, h)
         local sx, sy = chef.world_to_screen(p.x, p.y, p.z + 0.8)
         if sx and sx > 0 and sx < w and sy > 0 and sy < h then
           local k = p.kind
-          local pal = palette(k)
+          local pal = M.mark_pal(k, cfg.mo_loot, 'm')
           local half = 4.1 * px                -- every kind the same size
           local tex, hw = k.texture, half
           if k.weapon then
             tex = TEXTURES.weapons[p.wid] or TEXTURES.weapon_generic
             half = 3.2 * px; hw = half * WEAPON_ASPECT
           end
-          local zl = k.weapon and 882 or 880   -- a weapon's marker over the loot's
+          local zl = M.lift(k, k.weapon and 882 or 880)   -- a weapon's marker over the loot's
           if not (tex and chef.bitmap(tex, sx - hw, sy - half, 2 * hw, 2 * half, pal.tint, zl)) then
             chef.rect(sx - half, sy - half, 2 * half, 2 * half, pal.X, zl)
           end
-          if n > 1 then btext(sx + hw + small, sy - 3 * small, tostring(n), small, pal.X, 885) end
+          if n > 1 then btext(sx + hw + small, sy - 3 * small, tostring(n), small, pal.X, M.lift(k, 885)) end
           local t = dist_text(sqrt(d2))
-          btext(sx - tw(t, small) / 2, sy - half - 8 * small, t, small, pal.X, 885)
+          btext(sx - tw(t, small) / 2, sy - half - 8 * small, t, small, pal.X, M.lift(k, 885))
         end
       end
     end
@@ -1311,7 +1615,7 @@ local function read_keys()
       tab_last = t
     end
   end
-  if cfg.markers and any_key(cfg.mark) then
+  if (cfg.markers or M.fm_on()) and any_key(cfg.mark) then
     markers_on = not markers_on
     chef.log('world markers %s', markers_on and 'shown' or 'hidden')
   end
@@ -1321,13 +1625,17 @@ end
 -- a reinforcement too) and for a moment after it lands, and at a mission's start not until the first drop has landed
 -- (or DROP_NONE s went by without one). A camera that jumps for a frame or two (aiming, a dive, a hit) isn't a drop:
 -- the fall has to last DROP_FOR s, or the radar would blink out now and then.
+-- Started in the middle of a mission (switched on in the options menu, or tried again) I've landed already, so I don't
+-- wait for a drop in that one: `under_way` is its world. A fall from then on still hides the radar.
 local DROP_SPEED, DROP_FOR, DROP_AFTER, DROP_NONE = 40, 0.4, 2.5, 12
-local drop = { mission = nil }
+local drop = { mission = nil, under_way = chef.in_mission() and chef.world_id() or nil }
 local function dropping(cam)
   local t = chef.time()
   if drop.mission ~= mission_id then
-    drop = { mission = mission_id, start = t, z = cam.z, t = t, landed = false, fall_at = nil, since = nil }
-    return true
+    local on_ground = drop.under_way == mission_id
+    drop = { mission = mission_id, start = t, z = cam.z, t = t, landed = on_ground, fall_at = nil, since = nil }
+    if on_ground then chef.log('started during a mission: the radar shows at once') end
+    return not on_ground
   end
   local dt = t - drop.t
   if dt > 0 then
@@ -1352,11 +1660,11 @@ local function dropping(cam)
   return true
 end
 
--- once a mission is over (back on the ship, or straight into the next): what its ledger ended on
-function M.mission_over()
+-- once a mission is over (back on the ship, or straight into the next), or I'm stopped in one: what its ledger ended on
+function M.mission_over(why)
   if not M.live then return end
   M.live = false
-  chef.log('mission over: %s | enemy death states learned so far: %d',
+  chef.log('%s: %s | enemy death states learned so far: %d', why or 'mission over',
     (M.last_line or '') ~= '' and 'ledger ' .. M.last_line or 'no loot found', M.learned)
 end
 
@@ -1418,7 +1726,7 @@ function M.update(dt)
   if #active == 0 or not here then
     if not here then M.mission_over() end
     -- every kind unticked in the options menu, or no mission: the unit list rests
-    if watch then watch.pause() end
+    if watch and watch.active then watch.pause() end
     return
   end
   if chef.world_id() ~= mission_id then
@@ -1437,10 +1745,11 @@ function M.update(dt)
   end
   M.live = true
   read_keys()
-  -- nothing to draw (hidden without markers, or riding the shuttle out): the unit list rests until something is shown
-  local markers_up = cfg.markers ~= nil and markers_on
-  if (hidden and not markers_up) or M.on_shuttle() then
-    if watch then watch.pause() end
+  -- nothing to draw (hidden or both panels off, without markers, or riding the shuttle out): the unit list rests until
+  -- something is shown
+  local markers_up = (cfg.markers ~= nil or M.fm_on()) and markers_on
+  if ((hidden or not (cfg.radar or cfg.ledger)) and not markers_up) or M.on_shuttle() then
+    if watch and watch.active then watch.pause() end
     return
   end
   if not watch then watch = chef.watch(watch_kinds, 3)
@@ -1462,13 +1771,18 @@ function M.update(dt)
   end
   local cam = chef.camera()
   if not cam then return end
-  check_alive(cam)
   if dropping(cam) then return end
+  -- (what's been picked up only matters to the radar, the ledger and the loot markers)
+  if not hidden or cfg.markers then check_alive(cam) end
   local w, h = chef.screen()
   local px = max(1, floor(h / 540 + 0.5))     -- 2 at 1080p, 3 at 1440p, 4 at 4K
+  if chef.time() >= (M.below_next or 0) then M.below_next = chef.time() + 5; M.read_below(w, h); M.read_dim() end
+  -- the enemies' places first (the radar and the enemy markers both draw them)
+  local reach = M.foe_reach()
+  if reach > 0 then foe_update(cam, reach) end
   draw_markers(px, cam, w, h)
-  if chef.time() >= hud_next then hud_next = chef.time() + HUD_EVERY; read_hud() end
   if hidden then return end
+  if chef.time() >= hud_next then hud_next = chef.time() + HUD_EVERY; read_hud() end
   local R = MY_RADIUS * h * cfg.scale
   local cx, cy, ledger_left = M.place(w, h, R)
   local ui = px * cfg.scale
@@ -1478,7 +1792,6 @@ function M.update(dt)
       floor(cx), floor(cy), tostring(cfg.pos), cfg.nudge_x, cfg.nudge_y, floor(R), cfg.rotate and 'turning with my view' or 'north up')
   end
   if cfg.radar then
-    if cfg.kinds.enemy or cfg.kinds.friend or cfg.kinds.squad then foe_update(cam) end
     draw_radar(ui, cam, cx, cy, R)
     if zoom_note.text and chef.time() < zoom_note.until_t then
       btext(cx - tw(zoom_note.text, px) / 2, cy + R * 0.72, zoom_note.text, px, chef.color(255, 255, 255, 230), 945)
@@ -1490,5 +1803,13 @@ function M.update(dt)
 end
 
 function M.shutdown() end
+
+-- The loader stops me (switched off in the options menu, errors, a hang, a try again) and a new copy may start in this
+-- same launch, from the top of this file. I only read the game and draw, so nothing of the game's needs putting back; the
+-- loader takes my unit list and callbacks, and my rows come back with the new copy. What goes is this copy's memory: the
+-- ledger starts over, so its last line goes to the log here.
+function M.on_stop()
+  M.mission_over('stopped')
+end
 
 return M

@@ -12,8 +12,8 @@
     either, the loot kinds get my vector shapes);
   --header-from <a working Lua patch> takes the patch header from a patch that works on the current game.
 
-Treasure Radar is a Chef Shared Loader addon packed as an Arsenal mod with Options. It needs Chef Shared Loader (1.0.0
-or newer, installed as its own mod) and carries no loader of its own.
+Treasure Radar is a Chef Shared Loader addon packed as an Arsenal mod with Options. It needs Chef Shared Loader
+(installed as its own mod: NEEDS_LOADER below) and carries no loader of its own.
 The core folder holds the addon (treasure_radar.lua) and its textures, and every option folder ships a small
 "-- HD2-Options: mods/chef/treasure_radar" resource the loader merges. The zip is the same byte for byte on every build.
 Needs Python 3 and Pillow; the Poppins Bold font for the numbers (fonts/Poppins-Bold.ttf, SIL Open Font License).
@@ -34,8 +34,8 @@ if '--header-from' in args:
     HEADER = open(args[args.index('--header-from') + 1], 'rb').read()[12:72]
 assert len(HEADER) == 60
 
-TM_VERSION = '0.7.1'
-NEEDS_LOADER = '1.0.0'                                     # the oldest Chef Shared Loader Treasure Radar runs on
+TM_VERSION = '0.7.2'
+NEEDS_LOADER = '1.3.1'                                    # the oldest Chef Shared Loader Treasure Radar runs on
 TM_GUID = 'dde1d14f-762f-4abf-85ed-42846077674c'           # Treasure Radar
 TM_TEST_GUID = '8e41c7a2-3f5d-4b90-a6e1-0d29b7f4c853'      # Treasure Radar Tester and test builds (installs beside it)
 ZIP_DATE = (2026, 10, 21, 0, 0, 0)
@@ -48,20 +48,20 @@ TM_KINDS = [  # (option folder, Arsenal name, description, options table as Lua)
     ('super', 'Super Samples', 'In pink.', "{ kinds = { super = true } }"),
     ('requisition', 'Requisition Slips', 'In requisition yellow.', "{ kinds = { requisition = true } }"),
     ('ammo', 'Ammo Boxes', "In the game's ammo yellow.", "{ kinds = { ammo = true } }"),
-    ('grenade', 'Grenade Packs', 'In olive green.', "{ kinds = { grenade = true } }"),
+    ('grenade', 'Grenade Packs', 'In green.', "{ kinds = { grenade = true } }"),
     ('stim', 'Stim Packs', 'In blue.', "{ kinds = { stim = true } }"),
 ]
-# (the game's world darkens the middle of each channel on the way to the screen: rare's orange and super's pink are
-# picked light so they land orange and pink there, not red and purple. Not too light: the ledger draws its icons fully
-# solid, where the radar's are 72% between sweeps, so a pastel looks rich on the radar but faded in the ledger)
-TM_COLORS = {'credit': (115, 233, 242), 'super': (255, 140, 220), 'rare': (255, 190, 80), 'medal': (255, 221, 31),
-             'common': (95, 220, 60), 'requisition': (244, 247, 56), 'ammo': (255, 234, 128), 'grenade': (135, 170, 45),
-             'stim': (60, 140, 255), 'enemy': (255, 70, 50), 'enemydot': (255, 70, 50), 'frienddot': (80, 170, 255), 'squaddot': (60, 230, 120), 'fabricator': (190, 20, 30), 'bulkfab': (190, 20, 30), 'ilship': (190, 20, 30), 'bughole': (190, 20, 30)}
-# Weapons (a kind outside the ledger), Still Radar and the keys. Key ids are the addon's KEYS names.
+# (the loot icons draw in the top world, as the game's own HUD does, in the game's own colors: `top_ui` in the Lua's KINDS.
+# With HDR off the game's world pushes a color with a middling channel to the nearest pure one, so stims, which stay
+# there, are a deep blue that doesn't land on the credit's cyan)
+TM_COLORS = {'credit': (115, 233, 242), 'super': (255, 105, 232), 'rare': (255, 148, 38), 'medal': (250, 218, 90),
+             'common': (85, 240, 150), 'requisition': (248, 240, 100), 'ammo': (255, 234, 128), 'grenade': (0, 153, 0),
+             'stim': (40, 94, 255), 'enemy': (255, 70, 50), 'enemydot': (255, 70, 50), 'frienddot': (80, 170, 255), 'squaddot': (60, 230, 120), 'fabricator': (190, 20, 30), 'bulkfab': (190, 20, 30), 'ilship': (190, 20, 30), 'bughole': (190, 20, 30)}
+# Weapons (a kind outside the ledger), Radar Animation and the keys. Key ids are the addon's KEYS names.
 WEAPON_KIND = ('weapon', 'Weapons', "Support weapons and expendables lying on the ground (a fallen Helldiver's, one set down, an unused drop), each with its own silhouette, on the radar and as world markers. Not in the ledger; weapons someone is holding or carrying aren't shown. Pick which weapons show in game in Chef Shared Loader's options menu (F9): each weapon has its own row.",
                "{ kinds = { weapon = true } }")
 # Enemies, SEAF Troopers and Civilians, Squadmates (each its own option)
-ENEMY_KIND = ('enemies', 'Enemies', "Enemies on the radar while they're inside its range, in red: heavies (Chargers, Impalers, Bile Titans, Hulks, Tanks, Striders, Harvesters and the like) with the game's skull, the rest as the game's enemy dot (medium ones bigger). A killed enemy drops off, though some (Fleshmobs, Devastators, Berserkers, Harvesters) may linger about 10 seconds after they die. Tick it and pick which (All without a pick). Not in the ledger and no world markers.",
+ENEMY_KIND = ('enemies', 'Enemies', "Enemies on the radar while they're inside its range, in red: heavies (Chargers, Impalers, Bile Titans, Hulks, Tanks, Striders, Harvesters and the like) with the game's skull, the rest as the game's enemy dot (medium ones bigger). A killed enemy drops off, though some (Devastators, Berserkers) may linger about 10 seconds after they die. Tick it and pick which (All without a pick). Not in the ledger; for markers over enemies in the world, see Enemy Markers.",
               "{ kinds = { enemy = true } }")
 FRIEND_KIND = ('friendlies', 'SEAF Troopers and Civilians', "Friendly SEAF troopers and civilians (an evacuation's) as blue dots on the radar while they're inside its range. One drops off when it dies. Not in the ledger and no world markers.",
                "{ kinds = { friend = true } }")
@@ -93,6 +93,20 @@ RANGES = [150, 75, 100, 200, 250, 300]          # meters from me to the radar's 
 POSITIONS = [('map', 'Beside the map (default)'), ('tl', 'Top left'), ('tr', 'Top right'), ('ml', 'Middle left'),
              ('mr', 'Middle right'), ('bl', 'Bottom left'), ('br', 'Bottom right')]
 MARKER_RANGES = [50, 5, 10, 15, 25, 100, 200, 'endless']   # 'endless': no limit (the addon's ENDLESS)
+# Radar Icon Size in percent (the default first, as Arsenal ticks the first sub-option)
+ICON_SIZES = [100, 125, 150, 175, 200, 75, 50]
+# The world markers' opacity, one option per group: (folder, name, the addon's option, description)
+MARKER_OPACITY = [100, 75, 50, 25]
+MARKER_OPACITY_GROUPS = [
+    ('markeropacity', 'Marker Opacity', 'marker_opacity', "How solid the world markers over loot, supplies, enemy structures and weapons are. Tick it and pick a level (100% without it)."),
+    ('regularopacity', 'Regular Enemy Marker Opacity', 'regular_marker_opacity', "How solid the Enemy Markers over light and medium enemies are. Tick it and pick a level (100% without it)."),
+    ('heavyopacity', 'Heavy Enemy Marker Opacity', 'heavy_marker_opacity', "How solid the Enemy Markers over heavy enemies are. Tick it and pick a level (100% without it).")]
+# Enemy Markers: their range ('radar': the radar's own range; off first, as Arsenal ticks the first sub-option) and
+# which enemies get one: (key, name, description)
+ENEMY_MARKER_RANGES = ['off', 25, 50, 100, 150, 200, 'radar']
+ENEMY_MARKS = [('both', 'Regular and heavy (default)', 'A marker over every enemy in range: heavies as the skull with how far they are, the rest as the dot.'),
+               ('heavy', 'Heavy only', 'Markers only over the heavies (Chargers, Bile Titans, Hulks, Tanks, Striders, Harvesters and the like).'),
+               ('regular', 'Regular only', 'Markers only over the light and medium enemies, as dots.')]
 
 
 def options_resource(folder, table):
@@ -130,7 +144,8 @@ def build_tm():
     global GAME_ICONS
     GAME_ICONS = icons.has_game_icons()
     if not GAME_ICONS:
-        print('note: no pickup_icons/: the loot icons come from --weapons-from, else my vector shapes')
+        print('WARNING: no pickup_icons/: the loot icons come from --weapons-from with that zip\'s colors baked in, so TM_COLORS '
+              'only applies with that release\'s own zip (with no zip: my vector shapes)')
     from PIL import Image
     d = os.path.join(OUT, 'treasure_radar')
     shutil.rmtree(d, ignore_errors=True)
@@ -178,7 +193,8 @@ def build_tm():
 
     def sized(key, master, w, ht, lua_key=None, ui=True, steps=rt.LADDER):
         """a texture shipped at each size of its ladder (radar_textures.ladder), each shrunk straight from the 4x master:
-        the biggest under the texture's own id (and lua_key), the rest as key_w<width>; with ui, each one's UI-world copy"""
+        the biggest under the texture's own id (and lua_key), the rest as key_w<width>; with ui, each one's UI-world copy
+        (ui='self': each one is its own)"""
         lua_key = lua_key or 'TEXTURES.' + key
         ladder = []
         for i, size in enumerate(rt.ladder(w, ht, steps)):
@@ -186,7 +202,7 @@ def build_tm():
             k2 = key if i == 0 else '%s_w%d' % (key, size[0])
             tid = tex(k2, im, lua_key if i == 0 else False)
             if ui:
-                uid = tex(k2 + '_ui', rt.ui_copy(im), False)
+                uid = tid if ui == 'self' else tex(k2 + '_ui', rt.ui_copy(im), False)
                 lines.append("TEXTURES_UI['%016x'] = '%016x'" % (tid, uid))
             ladder.append((size[0], tid))
         ladder.reverse()
@@ -195,7 +211,8 @@ def build_tm():
     # kind's color with a dark outline
     S = icon_textures.SIZE
     for kid, rgb in TM_COLORS.items():
-        sized('icon2_' + kid, icon_textures.icon_master(kid, rgb), S, S, 'TEXTURES.' + kid)
+        # (the curve read off gray patches can't carry a mixed color over, so below native an icon is its own UI copy)
+        sized('icon2_' + kid, icon_textures.icon_master(kid, rgb), S, S, 'TEXTURES.' + kid, ui='self')
     # the sonar panel (with N E S W, and without them for Rotate With View), the ledger's tile, the
     # check mark, the blip glow and the sweep's frames; the UI world's copies (radar_textures.ui_copy) are used below
     # native Render Scale
@@ -262,10 +279,19 @@ def build_tm():
         write_folder(os.path.join(d, f'position_{key}'), [options_resource(f'position_{key}', "{ position = '%s' }" % key)])
     for m in MARKER_RANGES:
         write_folder(os.path.join(d, f'markers_{m}'), [options_resource(f'markers_{m}', '{ markers = %d }' % (100000 if m == 'endless' else m))])
+    for folder, _, key, _ in MARKER_OPACITY_GROUPS:
+        for pct in MARKER_OPACITY:
+            write_folder(os.path.join(d, f'{folder}_{pct}'), [options_resource(f'{folder}_{pct}', '{ %s = %.2f }' % (key, pct / 100))])
+    for m in ENEMY_MARKER_RANGES:
+        write_folder(os.path.join(d, f'enemymarkers_{m}'), [options_resource(f'enemymarkers_{m}', "{ enemy_markers = %s }" % ({'radar': "'radar'", 'off': 'false'}.get(m, m)))])
+    for k, _, _ in ENEMY_MARKS:
+        write_folder(os.path.join(d, f'enemymarks_{k}'), [options_resource(f'enemymarks_{k}', "{ enemy_marks = '%s' }" % k)])
     for m in RANGES:
         write_folder(os.path.join(d, f'range_{m}'), [options_resource(f'range_{m}', '{ range = %d }' % m)])
     for pct in OPACITY:
         write_folder(os.path.join(d, f'opacity_{pct}'), [options_resource(f'opacity_{pct}', '{ opacity = %.2f }' % (pct / 100))])
+    for pct in ICON_SIZES:
+        write_folder(os.path.join(d, f'iconsize_{pct}'), [options_resource(f'iconsize_{pct}', '{ icon_size = %.2f }' % (pct / 100))])
     write_folder(os.path.join(d, WEAPON_KIND[0]), [options_resource(WEAPON_KIND[0], WEAPON_KIND[3])])
     write_folder(os.path.join(d, STRUCT_KIND[0]), [options_resource(STRUCT_KIND[0], STRUCT_KIND[3])])
     write_folder(os.path.join(d, ENEMY_KIND[0]), [options_resource(ENEMY_KIND[0], ENEMY_KIND[3])])
@@ -313,6 +339,8 @@ def build_tm():
         {'Name': 'Loot Ledger', 'Description': "Left of the radar: a tile for each kind with how many are left in the mission (structures, then credits, medals and slips, then samples, then supplies); a cleared kind gets a check mark.", 'Image': img('ledger'), 'Include': ['ledger']},
         {'Name': 'Opacity', 'Description': "How solid the radar's panel and sweep and the ledger's tiles are; the icons and counts stay solid (at 0% only they're left). Tick it and pick a level (100% without it).", 'Image': img('opacity'), 'Include': [],
          'SubOptions': [{'Name': f'{pct}%', 'Description': f"The radar's panel and sweep and the ledger's tiles at {pct}%.", 'Image': img(f'opacity_{pct}'), 'Include': [f'opacity_{pct}']} for pct in OPACITY]},
+        {'Name': 'Radar Icon Size', 'Description': "How big the icons on the radar are: loot, supplies, weapons, enemies and friendlies. Tick it and pick a size (100% without it).", 'Image': img('iconsize'), 'Include': [],
+         'SubOptions': [{'Name': f'{pct}%' + (' (default)' if pct == 100 else ''), 'Description': f'The icons on the radar at {pct}%.', 'Image': img(f'iconsize_{pct}'), 'Include': [f'iconsize_{pct}']} for pct in ICON_SIZES]},
         {'Name': 'Size', 'Description': 'How big the radar and the ledger are. Tick it and pick a size (Medium without it).', 'Image': img('size'), 'Include': [],
          'SubOptions': [{'Name': n, 'Description': dsc, 'Image': img(f'size_{k}'), 'Include': [f'size_{k}']} for k, n, dsc in
                         [('medium', 'Medium (default)', "The radar at 75% of the game's map circle."), ('small', 'Small', 'At 60%.'), ('large', 'Large', "At 100%: as big as the game's map circle.")]]},
@@ -326,6 +354,16 @@ def build_tm():
          'SubOptions': [{'Name': ('Endless' if m == 'endless' else f'{m} m' + (' (default)' if m == 50 else '')),
                          'Description': ('Markers on every pickup, however far.' if m == 'endless' else f'Markers on pickups within {m} m.'),
                          'Image': img(f'markers_{m}' if m != 'endless' else 'markers'), 'Include': [f'markers_{m}']} for m in MARKER_RANGES]},
+        {'Name': 'Enemy Markers', 'Description': "A marker floats over each enemy within the range you pick: heavies as the game's skull with how far they are, the rest as the enemy dot. Works without the Enemies option (that one is the radar's). Pick which enemies get one with Enemy Markers For. F8 hides or shows them with the other world markers.",
+         'Image': img('enemymarkers'), 'Include': [],
+         'SubOptions': [{'Name': {'off': 'Off (default)', 'radar': "The radar's range"}.get(m, f'{m} m'),
+                         'Description': {'off': 'No markers over enemies.', 'radar': 'Markers on enemies as far out as the radar reaches (its zoom too).'}.get(m, f'Markers on enemies within {m} m.'),
+                         'Image': img(f'enemymarkers_{m}'), 'Include': [f'enemymarkers_{m}']} for m in ENEMY_MARKER_RANGES]},
+        {'Name': 'Enemy Markers For', 'Description': "Which enemies get an Enemy Marker: regular (light and medium) ones, heavy ones, or both (both without a pick).", 'Image': img('enemymarks'), 'Include': [],
+         'SubOptions': [{'Name': n, 'Description': dsc, 'Image': img(f'enemymarks_{k}'), 'Include': [f'enemymarks_{k}']} for k, n, dsc in ENEMY_MARKS]},
+        *[{'Name': name, 'Description': dsc, 'Image': img(folder), 'Include': [],
+           'SubOptions': [{'Name': f'{pct}%' + (' (default)' if pct == 100 else ''), 'Description': f'At {pct}%.', 'Image': img(f'{folder}_{pct}'), 'Include': [f'{folder}_{pct}']} for pct in MARKER_OPACITY]}
+          for folder, name, _, dsc in MARKER_OPACITY_GROUPS],
         {'Name': 'Range', 'Description': "How far the radar reaches, from you to its edge. Tick it and pick a range (150 m without it). Loot farther out sits on the edge, pointing the way.", 'Image': img('range'), 'Include': [],
          'SubOptions': [{'Name': f'{m} m' + (' (default)' if m == 150 else ''), 'Description': f'The radar reaches {m} m.', 'Image': img(f'range_{m}'), 'Include': [f'range_{m}']} for m in RANGES]},
         {'Name': 'Radar Animation', 'Description': "The sweep that turns every 3 seconds and lights each pickup up as it passes. Untick it for a still radar with every pickup at full strength.", 'Image': img('animation'), 'Include': ['animation']},
@@ -348,7 +386,8 @@ def build_tm():
     # in the same order as the addon's rows in the loader's options menu (F9): the look, what shows, the keys, weapons
     by_name = {o['Name']: o for o in options}
     order = ['Treasure Radar (core)', 'Loot Ledger', 'Size', 'Radar Position', 'Range', 'Rotate With View', 'Opacity',
-             'Radar Animation', 'World Markers', 'Super Credits', 'Medals', 'Requisition Slips',
+             'Radar Icon Size', 'Radar Animation', 'World Markers', 'Marker Opacity', 'Enemy Markers', 'Enemy Markers For',
+             'Regular Enemy Marker Opacity', 'Heavy Enemy Marker Opacity', 'Super Credits', 'Medals', 'Requisition Slips',
              'Common Samples', 'Rare Samples', 'Super Samples', 'Ammo Boxes', 'Grenade Packs', 'Stim Packs',
              ENEMY_KIND[1], STRUCT_KIND[1], FRIEND_KIND[1], SQUAD_KIND[1], 'Double-Tap Tab To Hide', 'Hide Key',
              'Markers Key', 'Zoom Keys', WEAPON_KIND[1]]

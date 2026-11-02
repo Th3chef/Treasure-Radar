@@ -1,7 +1,7 @@
 # Treasure Radar - source
 
 The mod is a Chef Shared Loader addon packed as an Arsenal mod with Options. It needs the standalone Chef Shared Loader
-(1.0.0 or newer, its own mod); the loader's source lives only in the Chef Shared Loader kit, and loader changes go there.
+(1.3.1 or newer, its own mod); the loader's source lives only in the Chef Shared Loader kit, and loader changes go there.
 Everything here is built by `build.py` (Python 3 and Pillow), run from this folder:
 
     python3 build.py out --weapons-from Treasure-Radar-<ver>.zip
