@@ -9,28 +9,28 @@ body:
     id: version
     attributes:
       label: Mod version
-      placeholder: 0.7.1
+      placeholder: 0.7.2
     validations:
       required: true
   - type: textarea
     id: options
     attributes:
       label: Options
-      description: Which options you ticked (Loot Ledger, Size, Radar Position, Range, Rotate With View, Opacity, Radar Animation, World Markers, the keys) and which kinds (Enemy Structures, Enemies and which ones, SEAF Troopers and Civilians, Squadmates and Weapons included), and anything you changed in the F9 menu.
+      description: Which options you ticked (Loot Ledger, Size, Radar Position, Range, Rotate With View, Opacity, Radar Icon Size, Radar Animation, World Markers, Enemy Markers and the marker opacities, the keys) and which kinds (Enemy Structures, Enemies and which ones, SEAF Troopers and Civilians, Squadmates and Weapons included), and anything you changed in the F9 menu.
       placeholder: "Core, Loot Ledger, Size Small, Radar Position Top right, World Markers 50 m; all kinds, Enemies: Heavy only."
   - type: input
     id: loader
     attributes:
       label: Chef Shared Loader version
       description: The first line of chef_loader.log says it.
-      placeholder: 1.0.0
+      placeholder: 1.5.0
     validations:
       required: true
   - type: input
     id: hud
     attributes:
-      label: Screen resolution and HUD settings
-      placeholder: "3440x1440, HUD Scale 0.85, HUD Edge Offset 1"
+      label: Screen resolution, HUD and display settings
+      placeholder: "3440x1440, HUD Scale 0.85, HUD Edge Offset 1, HDR on, UI Brightness 11, Render Scale Native"
   - type: input
     id: game
     attributes:
