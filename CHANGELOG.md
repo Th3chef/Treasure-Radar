@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.7.2
+
+- Now needs Chef Shared Loader 1.3.1 or newer.
+- New: **Enemy Markers** (optional): a marker floats over each enemy within the range you pick, or the radar's range:
+  heavies as the game's skull with how far they are, the rest as the enemy dot. Pick regular enemies, heavy ones or both.
+  F8 hides or shows them with the other world markers.
+- New: **Marker Opacity**, **Regular Enemy Marker Opacity** and **Heavy Enemy Marker Opacity**: how solid each group of
+  world markers is.
+- New: **Radar Icon Size**: how big the icons on the radar are, from 50 to 200%.
+- Super Credits, Medals, Requisition Slips, Common, Rare and Super Samples and Grenade Packs now match the colors of the
+  game's own icons, with HDR on or off. Fixed: with HDR off, Rare Samples showed red, close to the enemies' red.
+- Fixed: Stim Packs and Super Credits looked alike with HDR off. Stim Packs are a deeper blue now.
+- Fixed: below native Render Scale (Ultra Quality and lower) the icons came out pale.
+- Killed enemies leave the radar sooner: many kinds as they fall, and Fleshmobs and Harvesters within a few seconds.
+- With Chef Shared Loader 1.5.0 or newer, switching Treasure Radar off and on in the options menu (F9) restarts it when
+  the menu closes, and in a mission it shows again at once. Its ledger then starts from what's still lying around.
+
 ## 0.7.1
 
 - Fixed: Rare Samples showed red in game, close to the enemies' red. They're orange now, and Super Samples show pink

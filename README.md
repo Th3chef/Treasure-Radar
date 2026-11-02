@@ -6,13 +6,13 @@ https://github.com/user-attachments/assets/beb7f2cc-3027-453f-b04d-3c7e0bd07b2c
 
 *Every sample, medal, Super Credit, Requisition Slip and supply around you, plus the enemies, troopers and squadmates near you, on a sonar radar beside your map.*
 
-**Download:** `Treasure-Radar-0.7.1.zip` from the [latest release](https://github.com/Th3chef/Treasure-Radar/releases/latest) (not the source code). **Needs [Chef Shared Loader](https://github.com/Th3chef/Chef-Shared-Loader) 1.0.0 or newer**, installed as its own mod.
+**Download:** `Treasure-Radar-0.7.2.zip` from the [latest release](https://github.com/Th3chef/Treasure-Radar/releases/latest) (not the source code). **Needs [Chef Shared Loader](https://github.com/Th3chef/Chef-Shared-Loader) 1.3.1 or newer**, installed as its own mod.
 
 A round sonar radar sits just left of where the game's map opens (bottom right) and shows the loot and supplies still lying around you, with a ledger of what's left in the mission and markers floating over the pickups near you. If you like, it also shows dropped weapons, enemy structures, the enemies around you, SEAF troopers, civilians and your squad. Sweep up the loot and restock before extraction instead of running back and forth looking for it. It's the successor of Treasure Map, rebuilt for the current game.
 
 ## Features
 
-- **Sonar radar:** Super Credits, Medals, Common, Rare and Super Samples, Requisition Slips, ammo boxes, grenade packs and stim packs around you, each kind in its own color with the game's own pickup icons. A sweep turns every 3 seconds and each pickup lights up as it passes. North is up, with N, E, S and W on the rim, or the radar turns with you (Rotate With View).
+- **Sonar radar:** Super Credits, Medals, Common, Rare and Super Samples, Requisition Slips, ammo boxes, grenade packs and stim packs around you, each kind with the game's own pickup icon, in the colors of the game's own HUD. A sweep turns every 3 seconds and each pickup lights up as it passes. North is up, with N, E, S and W on the rim, or the radar turns with you (Rotate With View).
 - **Beside your map, or where you like:** by default the radar sits just left of where the game's map opens, level with it, so the open map never covers it and it never covers the map. It follows your HUD Scale and HUD Edge Offset settings. Radar Position moves it to any corner or to mid height on either side, and the options menu (F9) has sliders to nudge it from there.
 - **Loot farther out:** loot beyond the radar's range sits on its edge, pointing the way. Supplies only show inside the range.
 - **Piles:** pickups of one kind lying together share one icon, with how many it stands for next to it.
@@ -22,12 +22,13 @@ A round sonar radar sits just left of where the game's map opens (bottom right) 
 - **Enemy structures (optional):** fabricators, Bulk Fabricators and Illuminate warp ships in deep red; they drop off once destroyed, also ones destroyed before you joined. Bug holes too: they drop off once closed.
 - **Enemies (optional):** the enemies inside the radar's range as red dots (medium ones bigger), heavies (Chargers, Impalers, Bile Titans, Hulks, Tanks, Striders, Harvesters, Fleshmobs and the like) with the game's skull. Show all of them, medium and heavy, or heavy only. A killed enemy drops off; for many kinds right as it dies, and the radar learns more kinds' deaths as you play. Some may linger about 10 seconds after they die (see Known limitations).
 - **Friendlies (optional):** SEAF troopers and civilians as blue dots, your squadmates as green dots, inside the radar's range. Each drops off when it dies.
-- **World markers (optional):** each pickup near you gets its icon floating over it in the world, with how far it is (5 to 200 m, or endless; F8 hides or shows them). Pickups lying together share one marker with a count.
+- **World markers (optional):** each pickup near you gets its icon floating over it in the world, with how far it is (5 to 200 m, or endless; F8 hides or shows them). Pickups lying together share one marker with a count. Marker Opacity sets how solid they are.
+- **Enemy markers (optional):** a marker floats over each enemy within the range you pick (25 to 200 m, or the radar's range): heavies as the game's skull with how far they are, the rest as the enemy dot. Pick regular enemies, heavy ones or both, each with its own opacity. F8 hides or shows them with the other markers.
 - **Up to date:** a pickup near you that's picked up (by you or anyone else) leaves the radar, the markers and the ledger at once; farther away, within 3 seconds.
 - **Zoom:** the numpad's + and - step the radar's range from 50 to 500 m; it remembers the last one.
 - **Still or animated:** untick Radar Animation for a still radar with every pickup at full strength.
 - **Hide it:** F7, or tapping Tab twice quickly, hides or shows the radar and the ledger (a single tap still just opens the map). It also hides by itself while you ride the extraction shuttle out.
-- **Your look:** Opacity (100, 75, 50, 25 or 0%: at 0 only the icons and counts are left), Size (Small, Medium or Large) and the radar's Range (75 to 300 m).
+- **Your look:** Opacity (100, 75, 50, 25 or 0%: at 0 only the icons and counts are left), Size (Small, Medium or Large), Radar Icon Size (50 to 200%) and the radar's Range (75 to 300 m).
 - **Pick what you want:** each kind is its own option.
 - **Your keys:** pick the Hide Key, Zoom Keys and Markers Key in your mod manager, or bind them in game.
 - **Change it in game:** every setting (and the keys) is also in Chef Shared Loader's options menu (F9), applied at once and saved.
@@ -44,9 +45,14 @@ In your mod manager (Arsenal / HD2 Mod Manager), on the mod's row, in the same o
 - **Range**: 150 m (without it), 75, 100, 200, 250 or 300 m.
 - **Rotate With View**: the radar turns with you instead of north up.
 - **Opacity**: 100% (without it), 75, 50, 25 or 0%: how solid the radar's panel and sweep and the ledger's tiles are.
+- **Radar Icon Size**: 100% (without it), 125, 150, 175, 200, 75 or 50%: how big the icons on the radar are.
 - **Radar Animation** (ticked by default): the sweep and the pickups lighting up; unticked, a still radar.
 - **World Markers**: 50 m (default), 5, 10, 15, 25, 100 or 200 m, or Endless (every pickup, however far).
-- **Super Credits** (Super Credit blue), **Medals** (medal yellow), **Requisition Slips** (requisition yellow), **Common Samples** (green), **Rare Samples** (orange), **Super Samples** (pink), **Ammo Boxes** (the game's ammo yellow), **Grenade Packs** (olive green), **Stim Packs** (blue).
+- **Marker Opacity**: 100% (without it), 75, 50 or 25%: how solid the markers over loot, supplies, enemy structures and weapons are.
+- **Enemy Markers**: Off (default), 25, 50, 100, 150 or 200 m, or the radar's range.
+- **Enemy Markers For**: Regular and heavy (without a pick), Heavy only or Regular only.
+- **Regular Enemy Marker Opacity**, **Heavy Enemy Marker Opacity**: 100% (without it), 75, 50 or 25%.
+- **Super Credits** (Super Credit blue), **Medals** (medal yellow), **Requisition Slips** (requisition yellow), **Common Samples** (green), **Rare Samples** (orange), **Super Samples** (pink), **Ammo Boxes** (the game's ammo yellow), **Grenade Packs** (green), **Stim Packs** (blue).
 - **Enemies** (red): All (without a pick), Medium and heavy, or Heavy only.
 - **Enemy Structures** (deep red).
 - **SEAF Troopers and Civilians** (blue), **Squadmates** (green).
@@ -58,12 +64,12 @@ In your mod manager (Arsenal / HD2 Mod Manager), on the mod's row, in the same o
 
 ## Requirements
 
-- **[Chef Shared Loader](https://github.com/Th3chef/Chef-Shared-Loader) 1.0.0 or newer**, installed and enabled as its own mod. It's the small loader that runs Treasure Radar; without it, Treasure Radar does nothing. (Up to 0.5.1 Treasure Radar carried its own copy of the loader; since 0.6.0 it uses the standalone one.)
+- **[Chef Shared Loader](https://github.com/Th3chef/Chef-Shared-Loader) 1.3.1 or newer**, installed and enabled as its own mod. It's the small loader that runs Treasure Radar; without it, Treasure Radar does nothing. (Up to 0.5.1 Treasure Radar carried its own copy of the loader; since 0.6.0 it uses the standalone one.)
 
 ## Install / update
 
-1. Mod manager (Arsenal / HD2 Mod Manager): add Chef Shared Loader (1.0.0 or newer) and enable it.
-2. Add `Treasure-Radar-0.7.1.zip` and enable it, tick Treasure Radar (core), the kinds you want and any options, then **Purge** and **Deploy**. Keep Chef Shared Loader last in your load order.
+1. Mod manager (Arsenal / HD2 Mod Manager): add Chef Shared Loader (1.3.1 or newer) and enable it.
+2. Add `Treasure-Radar-0.7.2.zip` and enable it, tick Treasure Radar (core), the kinds you want and any options, then **Purge** and **Deploy**. Keep Chef Shared Loader last in your load order.
 3. Updating from 0.6.0: the options are in a new order, so check your picks once before you Purge and Deploy.
 4. Updating from 0.5.1 or older: install Chef Shared Loader at the same time. Those versions had the loader built in; 0.6.0 and newer don't.
 5. Updating from Treasure Map: disable or remove Treasure Map first (it needs the old loaders, which no longer work on the current game).
@@ -82,9 +88,12 @@ Disable it in your mod manager, then Purge and Deploy. Its log, `treasure_radar.
 ## Known limitations
 
 - Objectives aren't shown, and neither are Bile Titan holes (nothing the mod can read changes when one is closed).
-- Some enemies' bodies stay on the radar about 10 seconds after they die (Fleshmobs, Devastators, Berserkers and Harvesters die in states the living use too), and so does a kind whose death the radar hasn't learned yet (usually about 10 seconds).
+- Some enemies' bodies stay on the radar about 10 seconds after they die (Devastators and Berserkers die in states the living use too), and so does a kind whose death the radar hasn't learned yet (usually about 10 seconds). Fleshmobs and Harvesters can take a few seconds.
 - A tank that drives and then parks can drop off the radar until it moves again (a parked tank looks like a destroyed one to the mod).
-- Enemies, troopers and squadmates show only inside the radar's range (no edge markers and no world markers for them).
+- Enemies, troopers and squadmates show only inside the radar's range (no edge markers for them), and troopers and squadmates get no world markers.
+- The loot icons are drawn where the game draws its own HUD, to keep their colors. With HDR off or at UI Brightness 11 or higher, that means they and their markers can show over the open map, and so does the whole radar below native Render Scale.
+- With HDR on, after you change UI Brightness the icons can take up to 90 seconds to catch up. Below native Render Scale they follow UI Brightness, as the game's own HUD does.
+- MDL3 runs Chef Shared Loader mods itself and doesn't show what they draw, so the radar, ledger and markers won't appear under it (going by its own notes; not tested).
 - An EAT a SEAF trooper is using can still show as lying on the ground now and then.
 - The radar's spot is measured for HUD Scale 0.75 to 1.25 and any HUD Edge Offset with the default Map Position; with another Map Position it may sit a little off the map.
 - Loot shows up once the game has spawned it near you (the list refreshes every 3 seconds).
@@ -95,7 +104,7 @@ Chef Shared Loader, a small Lua loader installed as its own mod, replaces the ga
 
 ## Troubleshooting
 
-- Nothing shows: check that Chef Shared Loader (1.0.0 or newer) is installed and enabled, that Treasure Radar (core) and at least one kind are ticked, that you Purged and Deployed, and that no other mod replacing the game's boot script was deployed after Chef Shared Loader. It only shows in missions.
+- Nothing shows: check that Chef Shared Loader (1.3.1 or newer) is installed and enabled, that Treasure Radar (core) and at least one kind are ticked, that you Purged and Deployed, and that no other mod replacing the game's boot script was deployed after Chef Shared Loader. It only shows in missions.
 - The radar sits off the map: tell me your resolution and HUD settings (HUD Scale, HUD Edge Offset, Map Position) with a screenshot with the map open.
 - Attach both logs to a bug report: *treasure_radar.log* and *chef_loader.log* in `%APPDATA%\Arrowhead\Helldivers2` (type that into the File Explorer address bar and press Enter). treasure_radar.log shows the options you picked, your HUD settings, where the radar sits on your screen, a summary of each mission and any problems; chef_loader.log shows that it started, any Lua errors and its timings. If the game crashed in Treasure Radar, the next launch switches it off and says so on screen (CHEF_LOADER.LOG) and in chef_loader.log.
 
