@@ -19,15 +19,16 @@ GAME_ICONS = {'credit': '9414ab4f02745820', 'medal': '980cf7bb9ce23913', 'requis
 # the skull has a dark rim baked into its alpha (only its light body is kept)
 READ = {'enemy': 'light'}
 PICKUP_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'pickup_icons')
-# kinds that share another's game icon in their own color: the SEAF troopers' blue dot is the enemy dot
-SAME = {'frienddot': 'enemydot', 'squaddot': 'enemydot'}
+# kinds that share another's game icon in their own color: the SEAF troopers' blue dot is the enemy dot (the squad has
+# its own shape, the Helldiver skull, drawn below)
+SAME = {'frienddot': 'enemydot'}
 # the reward icons for Super Credits and requisition slips have a bar under the square; I keep only the square
 DROP_BAR = ('credit', 'requisition')
 # the game's syringe lies flat and thin; tilted (needle up to the left) it fills the square like the other icons
 TILT = {'stim': -45}
 
 GRID = 36
-WIDTH = {'fabricator': 36, 'bulkfab': 36, 'ilship': 36, 'bughole': 36, 'titanhole': 36, 'ammo': 36, 'grenade': 32, 'stim': 36, 'medal': 26, 'common': 36, 'rare': 36, 'super': 36, 'credit': 36, 'requisition': 36, 'enemy': 30, 'enemydot': 36, 'frienddot': 36, 'squaddot': 36}
+WIDTH = {'fabricator': 36, 'bulkfab': 36, 'ilship': 36, 'bughole': 36, 'titanhole': 36, 'ammo': 36, 'grenade': 32, 'stim': 36, 'medal': 26, 'common': 36, 'rare': 36, 'super': 36, 'credit': 36, 'requisition': 36, 'enemy': 30, 'enemydot': 36, 'frienddot': 36, 'squaddot': 35}
 
 
 def octagon(cx, cy, rx, ry):
@@ -182,6 +183,16 @@ def draw_enemydot(d):
     ellipse(d, 18, 18, 18, 255)
 
 
+def draw_helldiver(d):
+    # a squadmate: the Helldiver skull, a peaked crown, straight sides, a cheekbone out on each side and a narrower jaw,
+    # with two round eyes and a small nose (the nose a point up, notched at the bottom)
+    d.polygon([(17.3, 0), (31.2, 4.6), (31.2, 17.6), (34.6, 23.2), (31.0, 29.9), (24.6, 30.3), (23.2, 36), (11.4, 36),
+               (10.0, 30.3), (3.6, 29.9), (0, 23.2), (3.4, 17.6), (3.4, 4.6)], fill=255)
+    ellipse(d, 9.7, 21.1, 3.6, 0)
+    ellipse(d, 24.9, 21.1, 3.6, 0)
+    d.polygon([(17.3, 25.0), (19.3, 28.9), (17.3, 27.6), (15.3, 28.9)], fill=0)
+
+
 def draw_heavy(d):
     # a plain skull (only without the game's icons)
     d.polygon([(4, 2), (26, 2), (30, 8), (30, 22), (24, 26), (24, 34), (6, 34), (6, 26), (0, 22), (0, 8)], fill=255)
@@ -190,7 +201,7 @@ def draw_heavy(d):
     d.polygon([(15, 20), (18, 25), (12, 25)], fill=0)
 
 
-DRAW = {'enemy': draw_heavy, 'enemydot': draw_enemydot, 'frienddot': draw_enemydot, 'squaddot': draw_enemydot, 'titanhole': draw_titanhole, 'bughole': draw_bughole, 'fabricator': draw_fabricator, 'bulkfab': draw_bulkfab, 'ilship': draw_ilship, 'ammo': draw_ammo, 'grenade': draw_grenade, 'stim': draw_stim, 'medal': draw_medal, 'common': draw_common, 'rare': draw_rare, 'super': draw_super, 'credit': draw_credit, 'requisition': draw_requisition}
+DRAW = {'enemy': draw_heavy, 'enemydot': draw_enemydot, 'frienddot': draw_enemydot, 'squaddot': draw_helldiver, 'titanhole': draw_titanhole, 'bughole': draw_bughole, 'fabricator': draw_fabricator, 'bulkfab': draw_bulkfab, 'ilship': draw_ilship, 'ammo': draw_ammo, 'grenade': draw_grenade, 'stim': draw_stim, 'medal': draw_medal, 'common': draw_common, 'rare': draw_rare, 'super': draw_super, 'credit': draw_credit, 'requisition': draw_requisition}
 
 
 def has_game_icons():

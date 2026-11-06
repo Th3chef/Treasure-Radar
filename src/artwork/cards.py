@@ -1,5 +1,5 @@
 """Treasure Radar release art: thumbnail (1254x1254, and the 512x512 Arsenal one), gallery photo (1920x1080), GitHub
-social preview (1280x640), the Nexus header (1300x372) and the AyakaMods cover (1600x1000, everything inside the middle
+social preview (1280x640) and the AyakaMods cover (1600x1000, everything inside the middle
 that the site's mod cards show). The scene comes from hero.py; the title, version badge and text are HTML rendered with Playwright Chromium
 (Anton + Barlow Condensed in fonts/, SIL Open Font License, from @fontsource).
 python cards.py <out dir> [version badge, e.g. 0.7] [--html]
@@ -111,18 +111,6 @@ def main():
         <div class="tag" style="font-size:26px">%(t)s</div>
         <div style="margin-top:20px">%(f)s</div>
       </div>""" % {'v': ver, 't': TAGLINE, 'f': feats(20)}))
-    # Nexus header 1300x372: the title, tagline and features on the left, the radar and ledger on the right
-    W, H = 1300, 372
-    bg = hero.hero(W, H, 1105, 186, 158)
-    jobs.append(('header_1300x372.png', W, H, bg, """
-      <div style="position:absolute;left:44px;top:32px;width:720px">
-        <div style="display:flex;align-items:flex-start;gap:18px">
-          <div class="title" style="font-size:86px;white-space:nowrap">Treasure Radar</div>
-          <span class="badge" style="font-size:32px;margin-top:6px">v%(v)s</span>
-        </div>
-        <div class="tag" style="font-size:26px;margin-top:14px;text-wrap:balance">%(t)s</div>
-        <div style="margin-top:18px">%(f)s</div>
-      </div>""" % {'v': ver, 't': TAGLINE, 'f': feats(18)}))
     # AyakaMods cover 1.6:1: everything inside the middle 1190x800 (the mod cards crop it to 1.2:1 .. 2:1)
     W, H = 1600, 1000
     bg = hero.hero(W, H, 1200, 500, 270)

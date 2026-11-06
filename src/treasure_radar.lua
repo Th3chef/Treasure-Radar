@@ -15,7 +15,7 @@
 local chef = ...
 -- my log is treasure_radar.log next to the loader's; a loader without own_log keeps my lines in chef_loader.log
 if type(chef.own_log) == 'function' then chef.own_log('treasure_radar') end
-local M = { version = '0.7.2' }
+local M = { version = '0.7.3' }
 local floor, sqrt, max, min, atan2, exp, pi = math.floor, math.sqrt, math.max, math.min, math.atan2, math.exp, math.pi
 
 -- Fallback icons, 9 x 9 (X = the kind's color, o = dark outline, . = empty), for when the textures can't be used.
@@ -113,7 +113,8 @@ local KINDS = {
               '965eae5a51acdd4a', '453fe22c634eb30f', 'f22d027b37bef107', 'da40bb347c7447f2', '604a794ec45bb820',
               'e8f19a0aa958e46d', '905809a4c28d8a45', 'cc188f0c80505c6c', '20b9c7734daead65', 'ac60e78435098c9d',
               '67dc32dca4f02d33', '19e18b46ec55d94a', '74e2285c01da4f71', '78e1497571012c47', '0adc9f9173ad8e1d',
-              '44458a2c52b002fb', '34dfd23365472e9e', 'f735a51a991e4bda', '9926876b2375a1bb' },
+              '44458a2c52b002fb', '34dfd23365472e9e', 'f735a51a991e4bda', '9926876b2375a1bb', '8ab62629db3d6ac8',
+              '662a7907531b45e5' },
     names = {
       ['1a7fcdff98c664b0'] = 'Charger', ['3aff5fd7d5450b99'] = 'Charger Behemoth', ['6b202392f4ab605e'] = 'Spore Charger',
       ['0ab7b92b131c228c'] = 'Rupture Charger', ['dcf8e74212fbee3b'] = 'Impaler', ['9e2e17f2ccccafdd'] = 'Bile Titan',
@@ -139,7 +140,8 @@ local KINDS = {
       ['20b9c7734daead65'] = 'Veracitor', ['ac60e78435098c9d'] = 'Watcher', ['67dc32dca4f02d33'] = 'Fleshmob',
       ['19e18b46ec55d94a'] = 'Stingray', ['74e2285c01da4f71'] = 'Warp Ship', ['78e1497571012c47'] = 'Voteless',
       ['0adc9f9173ad8e1d'] = 'Voteless', ['44458a2c52b002fb'] = 'Voteless', ['34dfd23365472e9e'] = 'Obtruder',
-      ['f735a51a991e4bda'] = 'Warp Ship', ['9926876b2375a1bb'] = 'Bunker Turret' },
+      ['f735a51a991e4bda'] = 'Warp Ship', ['9926876b2375a1bb'] = 'Bunker Turret', ['8ab62629db3d6ac8'] = 'Noxious Scavenger',
+      ['662a7907531b45e5'] = 'Noxious Spewer' },
     tier = {
       ['1a7fcdff98c664b0'] = 3, ['3aff5fd7d5450b99'] = 3, ['6b202392f4ab605e'] = 3, ['0ab7b92b131c228c'] = 3, ['dcf8e74212fbee3b'] = 3,
       ['9e2e17f2ccccafdd'] = 3, ['ef04cb84d097a497'] = 3, ['960b48a421a3faaa'] = 3, ['d465d9c7f77a07cb'] = 3, ['36aa99cce5e60146'] = 2,
@@ -155,7 +157,8 @@ local KINDS = {
       ['965eae5a51acdd4a'] = 3, ['453fe22c634eb30f'] = 3, ['f22d027b37bef107'] = 3, ['da40bb347c7447f2'] = 2, ['604a794ec45bb820'] = 2,
       ['e8f19a0aa958e46d'] = 2, ['905809a4c28d8a45'] = 2, ['cc188f0c80505c6c'] = 2, ['20b9c7734daead65'] = 2, ['ac60e78435098c9d'] = 2,
       ['67dc32dca4f02d33'] = 3, ['19e18b46ec55d94a'] = 2, ['74e2285c01da4f71'] = 2, ['78e1497571012c47'] = 1, ['0adc9f9173ad8e1d'] = 1,
-      ['44458a2c52b002fb'] = 1, ['34dfd23365472e9e'] = 1, ['f735a51a991e4bda'] = 2, ['9926876b2375a1bb'] = 2 } },
+      ['44458a2c52b002fb'] = 1, ['34dfd23365472e9e'] = 1, ['f735a51a991e4bda'] = 2, ['9926876b2375a1bb'] = 2, ['8ab62629db3d6ac8'] = 1,
+      ['662a7907531b45e5'] = 2 } },
   -- Friendlies: SEAF troopers (both kinds) and civilians (an evacuation's), as blue dots inside the radar's range,
   -- tracked like the enemies (they move, and a body loses its state machine, so one drops off when it dies).
   { id = 'friend', say = 'SEAF trooper', icon = 'skull', rgb = { 80, 170, 255 }, stack = 0, enemy = true, friendly = true, dot = 'frienddot',
@@ -163,9 +166,10 @@ local KINDS = {
     names = { ['7a3637cd33a54e4c'] = 'SEAF trooper', ['75f7e96af7dcd303'] = 'SEAF trooper', ['b08f09d64e228427'] = 'civilian',
       ['e71dbcb6a50f321b'] = 'civilian' },
     tier = { ['7a3637cd33a54e4c'] = 2, ['75f7e96af7dcd303'] = 2, ['b08f09d64e228427'] = 2, ['e71dbcb6a50f321b'] = 2 } },
-  -- Squadmates: the other Helldivers, as green dots inside the radar's range (not me: I'm the radar's middle). One who
-  -- dies drops off; reinforced, he's a new unit and shows again.
-  { id = 'squad', say = 'Helldiver', icon = 'skull', rgb = { 60, 230, 120 }, stack = 0, enemy = true, friendly = true, dot = 'squaddot',
+  -- Squadmates: the other Helldivers, as the green Helldiver skull inside the radar's range (not me: I'm the radar's
+  -- middle), drawn bigger than a dot (`half`) so its eyes show. One who dies drops off; reinforced, they're a new
+  -- unit and show again.
+  { id = 'squad', say = 'Helldiver', icon = 'skull', rgb = { 60, 230, 120 }, stack = 0, enemy = true, friendly = true, dot = 'squaddot', half = 4.5,
     units = { '4d1c334d294dfa97' }, names = { ['4d1c334d294dfa97'] = 'Helldiver' }, tier = { ['4d1c334d294dfa97'] = 2 } },
 }
 -- A Helldiver (any player). A weapon held or on someone's back sits up at their hands or back, a dropped one on the
@@ -266,26 +270,38 @@ local STILL = any_options and opt.animation ~= true
 -- table rather than a local each also keeps the drawing functions under Lua 5.1's 60 upvalues.
 local cfg = { radar = SHOW_RADAR, ledger = SHOW_LEDGER, scale = MAP_SCALE, rotate = ROTATE, markers = MARKERS,
               opacity = OPACITY, still = STILL, kinds = {}, weapons_off = {},
-              -- Enemies: the lowest tier shown (1 all, 2 medium and heavy, 3 heavy only)
-              enemy_tier = max(1, min(3, tonumber(opt.enemy_tier) or 1)),
+              -- Enemies shown: Arsenal's pick, a row of M.TIERS (1 all, 2 medium and heavy, 3 heavy only, 4 light and
+              -- medium, 5 light and heavy, 6 medium only, 7 light only); the options menu then has a switch per tier
+              enemy_tier = max(1, min(7, tonumber(opt.enemy_tier) or 1)),
               -- Position: where the radar sits (beside the game's map by default), and the player's nudge from there in
               -- steps of half a percent of the screen's height
               pos = opt.position or 'map', nudge_x = 0, nudge_y = 0 }
 for _, k in ipairs(KINDS) do cfg.kinds[k.id] = kind_on(k.id) end
--- World markers' opacity: the loot's (every kind but the enemies), the regular enemies' and the heavies'
+-- World markers' opacity: the loot's (every kind but the enemies), the light and medium enemies' and the heavies'
 function M.op(v) return max(0.1, min(1, tonumber(v) or 1)) end
 cfg.mo_loot, cfg.mo_regular, cfg.mo_heavy = M.op(opt.marker_opacity), M.op(opt.regular_marker_opacity), M.op(opt.heavy_marker_opacity)
 -- Icon size: every icon on the radar, 50-200% (loot, supplies, weapons, enemies, friendlies; not my own arrow)
 cfg.icon_scale = max(0.5, min(2, tonumber(opt.icon_size) or 1))
--- Enemy markers: their own range in meters ('radar': the radar's range; nil: off), and which ones get one (regular:
--- light and medium; heavy: the skulls). They don't need the radar's Enemies: they list what they mark themselves.
+-- Enemies shown, per Arsenal pick: light, medium, heavy on or off. The first three keep their old numbers, as
+-- Arsenal's folders saved them. cfg.tiers is what's on now: it starts from the pick, and the options menu's three
+-- switches (Show light / medium / heavy enemies) change it.
+M.TIERS = { { true, true, true }, { false, true, true }, { false, false, true }, { true, true, false },
+            { true, false, true }, { false, true, false }, { true, false, false } }
+cfg.tiers = { M.TIERS[cfg.enemy_tier][1], M.TIERS[cfg.enemy_tier][2], M.TIERS[cfg.enemy_tier][3] }
+function M.tier_on(t) return cfg.tiers[t] == true end
+-- Enemy markers: their own range in meters ('radar': the radar's range; nil: off), and which tiers get one. cfg.fm is
+-- light, medium, heavy on or off: it starts from Arsenal's Enemy Markers For pick, a row of M.TIERS by name (both and
+-- regular are the older picks' saved names: all three, and light and medium), and the options menu's three switches
+-- change it. They don't need the radar's Enemies: they list what they mark themselves.
 cfg.fm_range = opt.enemy_markers == 'radar' and 'radar' or tonumber(opt.enemy_markers)
-cfg.fm_regular, cfg.fm_heavy = opt.enemy_marks ~= 'heavy', opt.enemy_marks ~= 'regular'
-function M.fm_on() return cfg.fm_range ~= nil and (cfg.fm_regular or cfg.fm_heavy) end
+M.FM_PICKS = { both = 1, mediumheavy = 2, heavy = 3, regular = 4, lightheavy = 5, mediumonly = 6, lightonly = 7 }
+cfg.fm = {}
+for t = 1, 3 do cfg.fm[t] = M.TIERS[M.FM_PICKS[opt.enemy_marks] or 1][t] end
+function M.fm_on() return cfg.fm_range ~= nil and (cfg.fm[1] or cfg.fm[2] or cfg.fm[3]) end
 -- is an enemy of this tier wanted, on the radar (Enemies and Enemies shown) or as a world marker?
 function M.foe_wanted(t)
-  if cfg.kinds.enemy and t >= cfg.enemy_tier then return true end
-  return M.fm_on() and ((t == 3 and cfg.fm_heavy) or (t < 3 and cfg.fm_regular))
+  if cfg.kinds.enemy and M.tier_on(t) then return true end
+  return M.fm_on() and cfg.fm[t] == true
 end
 local ENDLESS = 10000                   -- World Markers at this range or more: no limit
 local function A(a) return floor(a * cfg.opacity + 0.5) end
@@ -553,13 +569,16 @@ do
       marker_opacity = { hint = 'How solid the markers over the loot, supplies, enemy structures and weapons are.' },
       enemy_markers = { heading = 'Enemy markers', sub = true,
         hint = 'A marker over each enemy within this range: heavies as the skull with how far they are, the rest as the dot. The world markers key hides or shows them too.' },
-      enemy_marks_regular = { hint = 'The light and medium ones (Warriors, Hunters, Troopers, Devastators, Voteless and the like).' },
-      enemy_marks_heavy = { hint = 'Chargers, Impalers, Bile Titans, Hulks, Tanks, Striders, Harvesters and the like.' },
+      enemy_marks_light = { hint = 'Scavengers, Hunters, Warriors, Troopers, Voteless and the like, as small dots.' },
+      enemy_marks_medium = { hint = 'Devastators, Berserkers, Hive Guards, Spewers, Overseers and the like, as dots.' },
+      enemy_marks_heavy = { hint = 'Chargers, Impalers, Bile Titans, Hulks, Tanks, Striders, Harvesters and the like, as skulls.' },
       kind_credit = { heading = 'Loot' },
       kind_common = { heading = 'Samples', sub = true },
       kind_ammo = { heading = 'Supplies', sub = true },
       kind_enemy = { heading = 'Enemies' },
-      enemy_tier = { hint = 'Medium and heavy skips the light ones (Scavengers, Hunters, Warriors, Troopers, Voteless and the like).' },
+      enemy_light = { hint = 'Scavengers, Hunters, Warriors, Troopers, Voteless and the like, as small dots.' },
+      enemy_medium = { hint = 'Devastators, Berserkers, Hive Guards, Spewers, Overseers and the like, as dots.' },
+      enemy_heavy = { hint = 'Chargers, Impalers, Bile Titans, Hulks, Tanks, Striders, Harvesters and the like, as skulls.' },
       kind_fabricator = { heading = 'Enemy structures', sub = true },
       kind_friend = { heading = 'Friendlies' },
       tab = { heading = 'Keys', hint = 'Tap Tab twice quickly to hide or show the radar and the ledger.' },
@@ -630,13 +649,12 @@ do
       { false, 25, 50, 100, 150, 200, 'radar' }, cfg.fm_range or false, function(v)
         if cfg.fm_range ~= (v or nil) then cfg.fm_range = v or nil; M.relist() end
       end)
-    toggle('enemy_marks_regular', 'Mark regular enemies', cfg.fm_regular, function(v)
-      if cfg.fm_regular ~= v then cfg.fm_regular = v; M.relist() end
-    end)
-    toggle('enemy_marks_heavy', 'Mark heavy enemies', cfg.fm_heavy, function(v)
-      if cfg.fm_heavy ~= v then cfg.fm_heavy = v; M.relist() end
-    end)
-    mo_row('regular_marker_opacity', 'Regular enemy opacity (%)', 'mo_regular')
+    for t, name in ipairs({ 'light', 'medium', 'heavy' }) do
+      toggle('enemy_marks_' .. name, 'Mark ' .. name .. ' enemies', cfg.fm[t], function(v)
+        if cfg.fm[t] ~= v then cfg.fm[t] = v; M.relist() end
+      end)
+    end
+    mo_row('regular_marker_opacity', 'Light and medium enemy opacity (%)', 'mo_regular')
     mo_row('heavy_marker_opacity', 'Heavy enemy opacity (%)', 'mo_heavy')
     -- The rows in groups, top to bottom: the look (above), then what shows (loot in ledger order, supplies, enemies,
     -- enemy structures, friendlies), then the keys, and the weapons last, as they bring a row for every weapon. Arsenal
@@ -662,15 +680,17 @@ do
       local k = by_id[id]
       if k then
         kind_row(k)
-        -- right under Show Enemies: which tiers
+        -- right under Show Enemies: a switch for each tier
         if k.enemy and not k.friendly then
-          choice('enemy_tier', 'Enemies shown', { 'All', 'Medium and heavy', 'Heavy only' }, { 1, 2, 3 }, cfg.enemy_tier, function(v)
-            if cfg.enemy_tier ~= v then
-              cfg.enemy_tier = v
-              apply_kinds()
-              if watch then watch.refresh() end
-            end
-          end)
+          for t, name in ipairs({ 'light', 'medium', 'heavy' }) do
+            toggle('enemy_' .. name, 'Show ' .. name .. ' enemies', cfg.tiers[t], function(v)
+              if cfg.tiers[t] ~= v then
+                cfg.tiers[t] = v
+                apply_kinds()
+                if watch then watch.refresh() end
+              end
+            end)
+          end
         end
       end
     end
@@ -725,8 +745,12 @@ local function log_settings(from)
     tostring(cfg.ledger), range_now, floor(cfg.opacity * 100 + 0.5),
     cfg.markers and (cfg.markers >= ENDLESS and 'endless' or (cfg.markers .. ' m')) or 'off')
   local r = cfg.fm_range
-  chef.log('enemy markers %s (regular %s, heavy %s) | marker opacity: loot %d%%, regular enemies %d%%, heavy enemies %d%%',
-    r == 'radar' and "at the radar's range" or (r and r .. ' m' or 'off'), cfg.fm_regular and 'on' or 'off', cfg.fm_heavy and 'on' or 'off',
+  local tl = {}
+  for t, name in ipairs({ 'light', 'medium', 'heavy' }) do if cfg.tiers[t] then tl[#tl + 1] = name end end
+  chef.log('enemies on the radar: %s', #tl > 0 and table.concat(tl, ', ') or 'none')
+  chef.log('enemy markers %s (light %s, medium %s, heavy %s) | marker opacity: loot %d%%, light and medium enemies %d%%, heavy enemies %d%%',
+    r == 'radar' and "at the radar's range" or (r and r .. ' m' or 'off'), cfg.fm[1] and 'on' or 'off', cfg.fm[2] and 'on' or 'off',
+    cfg.fm[3] and 'on' or 'off',
     floor(cfg.mo_loot * 100 + 0.5), floor(cfg.mo_regular * 100 + 0.5), floor(cfg.mo_heavy * 100 + 0.5))
   local off = {}
   for u in pairs(cfg.weapons_off) do off[#off + 1] = M.weapon_kind.names[u] or u end
@@ -931,6 +955,28 @@ M.foes, M.foe_i, M.foe_dead = {}, 0, {}
 M.foe_asm = { ['7a3637cd33a54e4c'] = true, ['75f7e96af7dcd303'] = true, ['846bc06c6b213a06'] = true, ['b16493b009eec762'] = true, ['00bcf8247a544cdc'] = true, ['d37e8d120d2836e3'] = true,
   ['4d1c334d294dfa97'] = true }
 local FOE = { BUDGET = 30, NEAR = 40, EVERY_NEAR = 0.1, EVERY_FAR = 1 }
+-- A read every 0.1 s would move the dots and markers 10 times a second, so between reads I draw each one gliding from
+-- where it was drawn at the last read to that read's place, over as long as the reads before took. That's one read
+-- behind, at no extra engine calls. A long wait (over GLIDE_MAX s) or a jump of over 15 m goes straight there.
+M.GLIDE_MAX = 0.5
+function M.glide_to(h, now, x, y, z)
+  local sx, sy, sz, d = x, y, z, 0
+  if h.gt and h.x then
+    sx, sy, sz = M.glide(h, now)
+    d = now - h.gt
+    if d > M.GLIDE_MAX or (x - sx) ^ 2 + (y - sy) ^ 2 + (z - sz) ^ 2 > 225 then sx, sy, sz, d = x, y, z, 0 end
+  end
+  h.gx, h.gy, h.gz, h.gt, h.gd = sx, sy, sz, now, d
+  h.x, h.y, h.z = x, y, z
+end
+-- where to draw one now
+function M.glide(h, now)
+  local d = h.gd
+  if not d or d <= 0 then return h.x, h.y, h.z end
+  local f = (now - h.gt) / d
+  if f >= 1 then return h.x, h.y, h.z end
+  return h.gx + (h.x - h.gx) * f, h.gy + (h.y - h.gy) * f, h.gz + (h.z - h.gz) * f
+end
 -- The dying: an enemy keeps its state machine while it plays its death, so a dead one would linger a few seconds.
 -- The last state each kind's dead were in before theirs went is its death state (seen DEATH_SEEN times, it counts):
 -- one in it is hidden at once.
@@ -953,12 +999,13 @@ local FOE = { BUDGET = 30, NEAR = 40, EVERY_NEAR = 0.1, EVERY_FAR = 1 }
 -- And one still "dying" after M.DYING_MAX seconds is alive (a body loses its state machine within about 10 s): it
 -- shows again, and that state is one the living use from then on.
 -- Learned through the game session; known from the start: Hulk 12, Trooper 60, Commissar 60, Warrior 26, Hive Guard
--- 26, Brood Commander 24, Scavenger 18, Voteless 31 (all three), the SEAF trooper's layers 3 = 197, 4 = 43, the
--- Overseer's layer 3 = 0, the Crescent Overseer's layer 2 = 9 and the Elevated Overseer's layers 2 = 5, 3 = 2.
+-- 26, Brood Commander 24, Scavenger 18 (the Noxious Scavenger dies in it too), Voteless 31 (all three), the SEAF
+-- trooper's layers 3 = 197, 4 = 43, the Overseer's layer 3 = 0, the Crescent Overseer's layer 2 = 9 and the Elevated
+-- Overseer's layers 2 = 5, 3 = 2.
 M.LAYER, M.DYING_MAX = 100000, 15
 M.foe_death = { ['846bc06c6b213a06'] = { [12] = 2 }, ['b2b3056bdf28e57b'] = { [60] = 2 }, ['a71aafd82c6ebc92'] = { [60] = 2 },
   ['09872e66d1276e1f'] = { [26] = 2 }, ['a1f37bf2a40fbde4'] = { [26] = 2 }, ['d522fd4748d443a5'] = { [24] = 2 },
-  ['c14e0e887e7d2106'] = { [18] = 2 }, ['78e1497571012c47'] = { [31] = 2 }, ['0adc9f9173ad8e1d'] = { [31] = 2 },
+  ['c14e0e887e7d2106'] = { [18] = 2 }, ['8ab62629db3d6ac8'] = { [18] = 2 }, ['78e1497571012c47'] = { [31] = 2 }, ['0adc9f9173ad8e1d'] = { [31] = 2 },
   ['44458a2c52b002fb'] = { [31] = 2 }, ['75f7e96af7dcd303'] = { [300197] = 2, [400043] = 2 },
   ['da40bb347c7447f2'] = { [300000] = 2 }, ['e8f19a0aa958e46d'] = { [200009] = 2 },
   ['604a794ec45bb820'] = { [200005] = 2, [300002] = 2 } }
@@ -1123,7 +1170,7 @@ end
 function M.bones(h, now, near)
   if M.still.KINDS[h.uk] then M.still.track(h, now)
   elseif near and M.tall.KINDS[h.uk] then M.tall.check(h, now) end
-  if h.tier == 3 and not h.k.friendly and not M.mark_top[h.uk] and M.fm_on() and cfg.fm_heavy then M.measure(h) end
+  if h.tier == 3 and not h.k.friendly and not M.mark_top[h.uk] and M.fm_on() and cfg.fm[3] then M.measure(h) end
 end
 local function foe_update(cam, reach)
   local fs = M.foes
@@ -1208,7 +1255,7 @@ local function foe_update(cam, reach)
       local v = alive and chef.call_kind('Unit.world_position', key, h.unit, 1)
       local x, y, z
       if v then x, y, z = chef.call('Vector3.to_elements', v) end
-      if type(x) == 'number' then h.x, h.y, h.z = x, y, z else h.gone = true end
+      if type(x) == 'number' then M.glide_to(h, now, x, y, z) else h.gone = true end
       local near = ((h.x or 0) - cam.x) ^ 2 + ((h.y or 0) - cam.y) ^ 2 <= near2
       if alive and not h.gone and h.ls then M.bones(h, now, near) end
       -- read again soon if it's on the radar or close to its edge, else in a while
@@ -1392,19 +1439,21 @@ local function draw_radar(px, cam, cx, cy, R)
   -- skull, the rest as the dot (medium ones and troopers bigger), drawn after the dots so the skulls sit on top. (The
   -- enemy markers can list enemies the radar doesn't show: the Enemies shown tier picks the radar's.)
   if #M.foes > 0 and (cfg.kinds.enemy or cfg.kinds.friend or cfg.kinds.squad) then
-    local r2 = range_now * range_now
+    local r2, now = range_now * range_now, chef.time()
     for pass = 1, 2 do
       for _, h in ipairs(M.foes) do
         local fk = h.k
-        if not h.gone and not h.dying and not h.body and cfg.kinds[fk.id] and (fk.friendly or h.tier >= cfg.enemy_tier) and (h.tier == 3) == (pass == 2) then
+        if not h.gone and not h.dying and not h.body and cfg.kinds[fk.id] and (fk.friendly or M.tier_on(h.tier)) and (h.tier == 3) == (pass == 2) then
           local pal = palette(fk)
-          local dx, dy = h.x - cam.x, h.y - cam.y
+          local hx, hy = M.glide(h, now)
+          local dx, dy = hx - cam.x, hy - cam.y
           if dx * dx + dy * dy <= r2 then
             dx, dy = turn(dx, dy)
             local sx, sy = cx + dx * scale, cy + dy * scale
             local ip = px * cfg.icon_scale
-            local half = ((h.tier == 3 and 5.5) or (h.tier == 2 and 2.6) or 1.8) * ip
-            -- the dot textures carry their color (the tint is white): red enemies, blue SEAF and civilians, green squad
+            local half = (fk.half or (h.tier == 3 and 5.5) or (h.tier == 2 and 2.6) or 1.8) * ip
+            -- the dot textures carry their color (the tint is white): red enemies, blue SEAF and civilians, the squad's
+            -- green skull
             local tex = h.tier == 3 and fk.texture or fk.dot_tex
             if not (tex and chef.bitmap(tex, sx - half, sy - half, 2 * half, 2 * half, pal.tint, 926 + pass)) then
               if h.tier == 3 then
@@ -1532,21 +1581,22 @@ end
 -- is this one on show at all right now? What neither the radar nor the enemy markers draw isn't read
 function M.foe_shown(h)
   local k = h.k
-  if cfg.radar and not hidden and cfg.kinds[k.id] and (k.friendly or h.tier >= cfg.enemy_tier) then return true end
-  return not k.friendly and markers_on and M.fm_on() and ((h.tier == 3 and cfg.fm_heavy) or (h.tier < 3 and cfg.fm_regular)) or false
+  if cfg.radar and not hidden and cfg.kinds[k.id] and (k.friendly or M.tier_on(h.tier)) then return true end
+  return not k.friendly and markers_on and M.fm_on() and cfg.fm[h.tier] == true
 end
 -- the enemy markers: a heavy as the skull with how far it is, the rest as the dot (no distance: there can be dozens),
 -- the skull higher up (heavies are tall)
 function M.draw_foe_marks(px, cam, w, h, small, my_z)
   local fr = cfg.fm_range == 'radar' and range_now or cfg.fm_range
-  local f2 = fr * fr
+  local f2, now = fr * fr, chef.time()
   for _, e in ipairs(M.foes) do
     local fk, heavy = e.k, e.tier == 3
-    if not e.gone and not e.dying and not e.body and e.z and not fk.friendly and ((heavy and cfg.fm_heavy) or (not heavy and cfg.fm_regular)) then
-      local dx, dy, dz = e.x - cam.x, e.y - cam.y, e.z - my_z
+    if not e.gone and not e.dying and not e.body and e.z and not fk.friendly and cfg.fm[e.tier] then
+      local ex, ey, ez = M.glide(e, now)
+      local dx, dy, dz = ex - cam.x, ey - cam.y, ez - my_z
       local d2 = dx * dx + dy * dy + dz * dz
       if d2 <= f2 then
-        local sx, sy = chef.world_to_screen(e.x, e.y, e.z + (heavy and (M.mark_top[e.uk] or 3.5) or 2.2))
+        local sx, sy = chef.world_to_screen(ex, ey, ez + (heavy and (M.mark_top[e.uk] or 3.5) or 2.2))
         if sx and sx > 0 and sx < w and sy > 0 and sy < h then
           local pal = M.mark_pal(fk, heavy and cfg.mo_heavy or cfg.mo_regular, heavy and 'mh' or 'mr')
           local half = (heavy and 4.1 or (e.tier == 2 and 2.6 or 2.0)) * px

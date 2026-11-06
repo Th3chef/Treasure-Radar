@@ -170,12 +170,23 @@ def make_markers(m=None):
     return img
 
 
+# Enemy Markers For: the tiers each pick marks (light, medium, heavy) and its label
+MARK_MIX = {'both': ((True, True, True), 'ALL'), 'mediumheavy': ((False, True, True), 'MED+HVY'),
+            'heavy': ((False, False, True), 'HEAVY'), 'regular': ((True, True, False), 'LGT+MED'),
+            'lightheavy': ((True, False, True), 'LGT+HVY'), 'mediumonly': ((False, True, False), 'MEDIUM'),
+            'lightonly': ((True, False, False), 'LIGHT')}
+
+
 def enemy_marks(img, which='both', alpha=1.0):
-    """a heavy's skull with its distance and regular enemies' dots, as world markers"""
-    if which in ('both', 'heavy'):
+    """a heavy's skull with its distance, medium enemies' dots and light ones' smaller dots, as world markers"""
+    light, medium, heavy = MARK_MIX[which][0]
+    if heavy:
         marker(img, 'enemy', 78, 128, 56, '24M', alpha)
-    if which in ('both', 'regular'):
-        for x, y, sz in ((168, 118, 24), (150, 176, 32), (206, 160, 26), (112, 196, 30)):
+    if medium:
+        for x, y, sz in ((150, 176, 34), (112, 200, 32)):
+            icon(img, 'enemydot', x, y, sz, alpha)
+    if light:
+        for x, y, sz in ((168, 118, 20), (206, 160, 22), (196, 208, 20)):
             icon(img, 'enemydot', x, y, sz, alpha)
 
 
@@ -186,7 +197,7 @@ def make_enemy_markers(m=None, which=None):
     if m != 'off':
         enemy_marks(img, which or 'both')
     if which:
-        text = {'both': 'BOTH', 'heavy': 'HEAVY', 'regular': 'REGULAR'}[which]
+        text = MARK_MIX[which][1]
     else:
         text = 'ENEMIES' if m is None else {'radar': 'RADAR', 'off': 'OFF'}.get(m, f'{m} M')
     label(img, text, 18, 38 if (m is None or which) else 48)
@@ -228,9 +239,11 @@ def make_kind(kid):
     if kid == 'friendlies':
         return make_friendlies()
     if kid == 'squadmates':
-        return make_friendlies(TM_COLORS['squaddot'])
+        return make_friendlies(TM_COLORS['squaddot'], 'squaddot', 44)
     if kid in ('enemies_all', 'enemies_medium'):
         return make_enemies(kid == 'enemies_all')
+    if kid in TIER_MIX:
+        return make_enemies(*TIER_MIX[kid])
     img = canvas(); icon(img, kid, 128, 128, 176); return img
 
 
@@ -253,25 +266,32 @@ def make_position(key):
     return img
 
 
-def make_friendlies(rgb=(80, 170, 255)):
-    """dots around me on the radar: blue (SEAF troopers and civilians), or green (the squad)"""
+def make_friendlies(rgb=(80, 170, 255), kid='enemydot', size=30):
+    """around me on the radar: blue dots (SEAF troopers and civilians), or the squad's green Helldiver skulls"""
     img = canvas()
     disc(img, 128, 128, 112, plain=True)
     me(img, 128, 128, 1.2)
-    dot = icon_textures.icon_master('enemydot', rgb).convert('RGBA')
+    dot = icon_textures.icon_master(kid, rgb).convert('RGBA')
     for x, y in ((90, 100), (165, 95), (100, 170), (175, 160)):
-        d = dot.resize((30, 30), Image.LANCZOS)
-        img.alpha_composite(d, (x - 15, y - 15))
+        d = dot.resize((size, size), Image.LANCZOS)
+        img.alpha_composite(d, (x - size // 2, y - size // 2))
     return img
 
 
-def make_enemies(light):
-    """a skull and dots on the radar: two medium dots, and with light ones, three small dots"""
+# the other Enemies Shown mixes: light, medium, heavy
+TIER_MIX = {'enemies_lightmedium': (True, True, False), 'enemies_lightheavy': (True, False, True),
+            'enemies_mediumonly': (False, True, False), 'enemies_lightonly': (True, False, False)}
+
+
+def make_enemies(light, medium=True, heavy=True):
+    """the tiers shown, on the radar: a skull for the heavies, two medium dots, three small dots for the light ones"""
     img = canvas()
     disc(img, 128, 128, 112, plain=True)
-    icon(img, 'enemy', 150, 100, 70)
-    for x, y in ((90, 150), (170, 170)):
-        icon(img, 'enemydot', x, y, 30)
+    if heavy:
+        icon(img, 'enemy', 150, 100, 70)
+    if medium:
+        for x, y in ((90, 150), (170, 170)):
+            icon(img, 'enemydot', x, y, 30)
     if light:
         for x, y in ((80, 95), (120, 190), (190, 130)):
             icon(img, 'enemydot', x, y, 18)
@@ -377,7 +397,7 @@ def all_images(kinds):
     out['enemymarkers'] = make_enemy_markers()
     for m in ('off', 25, 50, 100, 150, 200, 'radar'): out[f'enemymarkers_{m}'] = make_enemy_markers(m)
     out['enemymarks'] = make_enemy_markers(which='both')
-    for w in ('both', 'heavy', 'regular'): out[f'enemymarks_{w}'] = make_enemy_markers(which=w)
+    for w in MARK_MIX: out[f'enemymarks_{w}'] = make_enemy_markers(which=w)
     for k in kinds: out[k] = make_kind(k)
     return out
 

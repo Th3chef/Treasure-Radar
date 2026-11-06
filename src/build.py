@@ -34,7 +34,7 @@ if '--header-from' in args:
     HEADER = open(args[args.index('--header-from') + 1], 'rb').read()[12:72]
 assert len(HEADER) == 60
 
-TM_VERSION = '0.7.2'
+TM_VERSION = '0.7.3'
 NEEDS_LOADER = '1.3.1'                                    # the oldest Chef Shared Loader Treasure Radar runs on
 TM_GUID = 'dde1d14f-762f-4abf-85ed-42846077674c'           # Treasure Radar
 TM_TEST_GUID = '8e41c7a2-3f5d-4b90-a6e1-0d29b7f4c853'      # Treasure Radar Tester and test builds (installs beside it)
@@ -65,12 +65,16 @@ ENEMY_KIND = ('enemies', 'Enemies', "Enemies on the radar while they're inside i
               "{ kinds = { enemy = true } }")
 FRIEND_KIND = ('friendlies', 'SEAF Troopers and Civilians', "Friendly SEAF troopers and civilians (an evacuation's) as blue dots on the radar while they're inside its range. One drops off when it dies. Not in the ledger and no world markers.",
                "{ kinds = { friend = true } }")
-SQUAD_KIND = ('squadmates', 'Squadmates', "The other Helldivers in your squad as green dots on the radar while they're inside its range (you're the radar's middle). One drops off when he dies and shows again once reinforced. Not in the ledger and no world markers.",
+SQUAD_KIND = ('squadmates', 'Squadmates', "The other Helldivers in your squad as green Helldiver skulls on the radar while they're inside its range (you're the radar's middle). One drops off when they die and shows again once reinforced. Not in the ledger and no world markers.",
               "{ kinds = { squad = true } }")
 # Enemies' sub-options: (folder, name, description, tier)
 ENEMY_TIERS = [('enemies_all', 'All (default)', 'Every enemy: heavies as skulls, medium and light ones as dots.', 1),
                ('enemies_medium', 'Medium and heavy', 'Skips the light ones (Scavengers, Hunters, Warriors, Troopers, Voteless and the like).', 2),
-               ('enemies_heavy', 'Heavy only', 'Only the heavies, as skulls.', 3)]
+               ('enemies_heavy', 'Heavy only', 'Only the heavies, as skulls.', 3),
+               ('enemies_lightmedium', 'Light and medium', 'Skips the heavies: medium and light ones as dots.', 4),
+               ('enemies_lightheavy', 'Light and heavy', 'Skips the medium ones (Devastators, Berserkers, Hive Guards, Spewers, Overseers and the like).', 5),
+               ('enemies_mediumonly', 'Medium only', 'Only the medium ones, as dots.', 6),
+               ('enemies_lightonly', 'Light only', 'Only the light ones, as small dots.', 7)]
 # Enemy Structures (one option for all of its kinds), in deep red
 STRUCT_KIND = ('structures', 'Enemy Structures', "Bot fabricators, Bulk Fabricators, Illuminate warp ships and bug holes, in deep red, on the radar (farther ones on its edge), in the ledger and as world markers. Fabricators, Bulk Fabricators and warp ships drop off once destroyed, bug holes once closed.",
                "{ kinds = { fabricator = true, bulkfab = true, ilship = true, bughole = true } }")
@@ -99,14 +103,19 @@ ICON_SIZES = [100, 125, 150, 175, 200, 75, 50]
 MARKER_OPACITY = [100, 75, 50, 25]
 MARKER_OPACITY_GROUPS = [
     ('markeropacity', 'Marker Opacity', 'marker_opacity', "How solid the world markers over loot, supplies, enemy structures and weapons are. Tick it and pick a level (100% without it)."),
-    ('regularopacity', 'Regular Enemy Marker Opacity', 'regular_marker_opacity', "How solid the Enemy Markers over light and medium enemies are. Tick it and pick a level (100% without it)."),
+    ('regularopacity', 'Light and Medium Enemy Marker Opacity', 'regular_marker_opacity', "How solid the Enemy Markers over light and medium enemies are. Tick it and pick a level (100% without it)."),
     ('heavyopacity', 'Heavy Enemy Marker Opacity', 'heavy_marker_opacity', "How solid the Enemy Markers over heavy enemies are. Tick it and pick a level (100% without it).")]
 # Enemy Markers: their range ('radar': the radar's own range; off first, as Arsenal ticks the first sub-option) and
 # which enemies get one: (key, name, description)
 ENEMY_MARKER_RANGES = ['off', 25, 50, 100, 150, 200, 'radar']
-ENEMY_MARKS = [('both', 'Regular and heavy (default)', 'A marker over every enemy in range: heavies as the skull with how far they are, the rest as the dot.'),
+# (the keys both, heavy and regular are the older picks' saved names: the addon's M.FM_PICKS reads them all)
+ENEMY_MARKS = [('both', 'All (default)', 'A marker over every enemy in range: heavies as the skull with how far they are, medium and light ones as dots.'),
+               ('mediumheavy', 'Medium and heavy', 'Skips the light ones (Scavengers, Hunters, Warriors, Troopers, Voteless and the like).'),
                ('heavy', 'Heavy only', 'Markers only over the heavies (Chargers, Bile Titans, Hulks, Tanks, Striders, Harvesters and the like).'),
-               ('regular', 'Regular only', 'Markers only over the light and medium enemies, as dots.')]
+               ('regular', 'Light and medium', 'Skips the heavies: medium and light ones as dots.'),
+               ('lightheavy', 'Light and heavy', 'Skips the medium ones (Devastators, Berserkers, Hive Guards, Spewers, Overseers and the like).'),
+               ('mediumonly', 'Medium only', 'Markers only over the medium enemies, as dots.'),
+               ('lightonly', 'Light only', 'Markers only over the light enemies, as small dots.')]
 
 
 def options_resource(folder, table):
@@ -359,7 +368,7 @@ def build_tm():
          'SubOptions': [{'Name': {'off': 'Off (default)', 'radar': "The radar's range"}.get(m, f'{m} m'),
                          'Description': {'off': 'No markers over enemies.', 'radar': 'Markers on enemies as far out as the radar reaches (its zoom too).'}.get(m, f'Markers on enemies within {m} m.'),
                          'Image': img(f'enemymarkers_{m}'), 'Include': [f'enemymarkers_{m}']} for m in ENEMY_MARKER_RANGES]},
-        {'Name': 'Enemy Markers For', 'Description': "Which enemies get an Enemy Marker: regular (light and medium) ones, heavy ones, or both (both without a pick).", 'Image': img('enemymarks'), 'Include': [],
+        {'Name': 'Enemy Markers For', 'Description': "Which enemies get an Enemy Marker: light, medium and heavy ones in any mix (all without a pick). The options menu has a switch for each.", 'Image': img('enemymarks'), 'Include': [],
          'SubOptions': [{'Name': n, 'Description': dsc, 'Image': img(f'enemymarks_{k}'), 'Include': [f'enemymarks_{k}']} for k, n, dsc in ENEMY_MARKS]},
         *[{'Name': name, 'Description': dsc, 'Image': img(folder), 'Include': [],
            'SubOptions': [{'Name': f'{pct}%' + (' (default)' if pct == 100 else ''), 'Description': f'At {pct}%.', 'Image': img(f'{folder}_{pct}'), 'Include': [f'{folder}_{pct}']} for pct in MARKER_OPACITY]}
@@ -387,7 +396,7 @@ def build_tm():
     by_name = {o['Name']: o for o in options}
     order = ['Treasure Radar (core)', 'Loot Ledger', 'Size', 'Radar Position', 'Range', 'Rotate With View', 'Opacity',
              'Radar Icon Size', 'Radar Animation', 'World Markers', 'Marker Opacity', 'Enemy Markers', 'Enemy Markers For',
-             'Regular Enemy Marker Opacity', 'Heavy Enemy Marker Opacity', 'Super Credits', 'Medals', 'Requisition Slips',
+             'Light and Medium Enemy Marker Opacity', 'Heavy Enemy Marker Opacity', 'Super Credits', 'Medals', 'Requisition Slips',
              'Common Samples', 'Rare Samples', 'Super Samples', 'Ammo Boxes', 'Grenade Packs', 'Stim Packs',
              ENEMY_KIND[1], STRUCT_KIND[1], FRIEND_KIND[1], SQUAD_KIND[1], 'Double-Tap Tab To Hide', 'Hide Key',
              'Markers Key', 'Zoom Keys', WEAPON_KIND[1]]
