@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.7.3
+
+- New enemies: the Noxious Scavenger (light) and the Noxious Spewer (medium) show on the radar and get Enemy Markers.
+- **Enemies** and **Enemy Markers For** now take light, medium and heavy enemies in any mix: Arsenal has seven picks for
+  each, and the options menu (F9) has a switch per tier for each (Show light / medium / heavy enemies, Mark light /
+  medium / heavy enemies). If you changed "Enemies shown" or "Mark regular enemies" in F9 before, they start once from
+  your Arsenal pick.
+- Enemy dots and Enemy Markers glide smoothly as enemies move, instead of stepping.
+- Squadmates show as a green Helldiver skull instead of a dot.
+
 ## 0.7.2
 
 - Now needs Chef Shared Loader 1.3.1 or newer.

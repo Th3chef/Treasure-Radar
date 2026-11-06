@@ -6,7 +6,7 @@ https://github.com/user-attachments/assets/beb7f2cc-3027-453f-b04d-3c7e0bd07b2c
 
 *Every sample, medal, Super Credit, Requisition Slip and supply around you, plus the enemies, troopers and squadmates near you, on a sonar radar beside your map.*
 
-**Download:** `Treasure-Radar-0.7.2.zip` from the [latest release](https://github.com/Th3chef/Treasure-Radar/releases/latest) (not the source code). **Needs [Chef Shared Loader](https://github.com/Th3chef/Chef-Shared-Loader) 1.3.1 or newer**, installed as its own mod.
+**Download:** `Treasure-Radar-0.7.3.zip` from the [latest release](https://github.com/Th3chef/Treasure-Radar/releases/latest) (not the source code). **Needs [Chef Shared Loader](https://github.com/Th3chef/Chef-Shared-Loader) 1.3.1 or newer**, installed as its own mod.
 
 A round sonar radar sits just left of where the game's map opens (bottom right) and shows the loot and supplies still lying around you, with a ledger of what's left in the mission and markers floating over the pickups near you. If you like, it also shows dropped weapons, enemy structures, the enemies around you, SEAF troopers, civilians and your squad. Sweep up the loot and restock before extraction instead of running back and forth looking for it. It's the successor of Treasure Map, rebuilt for the current game.
 
@@ -20,10 +20,10 @@ A round sonar radar sits just left of where the game's map opens (bottom right) 
 - **Weapons (optional):** support weapons and expendables lying on the ground (a fallen Helldiver's, one set down, an unused drop), each with its own silhouette, on the radar and as world markers. Weapons someone holds or carries (a Helldiver or a SEAF trooper), and spent expendables, aren't shown. Pick which weapons show in the options menu (F9).
 - **Loot ledger (optional):** left of the radar (right of it when the radar sits on the left), a tile for each kind with its icon and how many are still lying in the mission. It counts down as things are picked up, and a cleared kind dims with a check mark.
 - **Enemy structures (optional):** fabricators, Bulk Fabricators and Illuminate warp ships in deep red; they drop off once destroyed, also ones destroyed before you joined. Bug holes too: they drop off once closed.
-- **Enemies (optional):** the enemies inside the radar's range as red dots (medium ones bigger), heavies (Chargers, Impalers, Bile Titans, Hulks, Tanks, Striders, Harvesters, Fleshmobs and the like) with the game's skull. Show all of them, medium and heavy, or heavy only. A killed enemy drops off; for many kinds right as it dies, and the radar learns more kinds' deaths as you play. Some may linger about 10 seconds after they die (see Known limitations).
-- **Friendlies (optional):** SEAF troopers and civilians as blue dots, your squadmates as green dots, inside the radar's range. Each drops off when it dies.
+- **Enemies (optional):** the enemies inside the radar's range as red dots (medium ones bigger), heavies (Chargers, Impalers, Bile Titans, Hulks, Tanks, Striders, Harvesters, Fleshmobs and the like) with the game's skull. Show light, medium and heavy enemies in any mix (the options menu has a switch for each). A killed enemy drops off; for many kinds right as it dies, and the radar learns more kinds' deaths as you play. Some may linger about 10 seconds after they die (see Known limitations).
+- **Friendlies (optional):** SEAF troopers and civilians as blue dots, your squadmates as green Helldiver skulls, inside the radar's range. Each drops off when it dies.
 - **World markers (optional):** each pickup near you gets its icon floating over it in the world, with how far it is (5 to 200 m, or endless; F8 hides or shows them). Pickups lying together share one marker with a count. Marker Opacity sets how solid they are.
-- **Enemy markers (optional):** a marker floats over each enemy within the range you pick (25 to 200 m, or the radar's range): heavies as the game's skull with how far they are, the rest as the enemy dot. Pick regular enemies, heavy ones or both, each with its own opacity. F8 hides or shows them with the other markers.
+- **Enemy markers (optional):** a marker floats over each enemy within the range you pick (25 to 200 m, or the radar's range): heavies as the game's skull with how far they are, the rest as the enemy dot. Pick light, medium and heavy enemies in any mix (the options menu has a switch for each); light and medium share one opacity, heavies have their own. F8 hides or shows them with the other markers.
 - **Up to date:** a pickup near you that's picked up (by you or anyone else) leaves the radar, the markers and the ledger at once; farther away, within 3 seconds.
 - **Zoom:** the numpad's + and - step the radar's range from 50 to 500 m; it remembers the last one.
 - **Still or animated:** untick Radar Animation for a still radar with every pickup at full strength.
@@ -50,10 +50,11 @@ In your mod manager (Arsenal / HD2 Mod Manager), on the mod's row, in the same o
 - **World Markers**: 50 m (default), 5, 10, 15, 25, 100 or 200 m, or Endless (every pickup, however far).
 - **Marker Opacity**: 100% (without it), 75, 50 or 25%: how solid the markers over loot, supplies, enemy structures and weapons are.
 - **Enemy Markers**: Off (default), 25, 50, 100, 150 or 200 m, or the radar's range.
-- **Enemy Markers For**: Regular and heavy (without a pick), Heavy only or Regular only.
-- **Regular Enemy Marker Opacity**, **Heavy Enemy Marker Opacity**: 100% (without it), 75, 50 or 25%.
+- **Enemy Markers For**: All (without a pick), Medium and heavy, Heavy only, Light and medium, Light and heavy, Medium only or Light only.
+- **Light and Medium Enemy Marker Opacity**, **Heavy Enemy Marker Opacity**: 100% (without it), 75, 50 or 25%.
 - **Super Credits** (Super Credit blue), **Medals** (medal yellow), **Requisition Slips** (requisition yellow), **Common Samples** (green), **Rare Samples** (orange), **Super Samples** (pink), **Ammo Boxes** (the game's ammo yellow), **Grenade Packs** (green), **Stim Packs** (blue).
-- **Enemies** (red): All (without a pick), Medium and heavy, or Heavy only.
+- **Enemies** (red): All (without a pick), Medium and heavy, Heavy only, Light and medium, Light and heavy, Medium only, or
+  Light only.
 - **Enemy Structures** (deep red).
 - **SEAF Troopers and Civilians** (blue), **Squadmates** (green).
 - **Double-Tap Tab To Hide** (ticked by default).
@@ -69,7 +70,7 @@ In your mod manager (Arsenal / HD2 Mod Manager), on the mod's row, in the same o
 ## Install / update
 
 1. Mod manager (Arsenal / HD2 Mod Manager): add Chef Shared Loader (1.3.1 or newer) and enable it.
-2. Add `Treasure-Radar-0.7.2.zip` and enable it, tick Treasure Radar (core), the kinds you want and any options, then **Purge** and **Deploy**. Keep Chef Shared Loader last in your load order.
+2. Add `Treasure-Radar-0.7.3.zip` and enable it, tick Treasure Radar (core), the kinds you want and any options, then **Purge** and **Deploy**. Keep Chef Shared Loader last in your load order.
 3. Updating from 0.6.0: the options are in a new order, so check your picks once before you Purge and Deploy.
 4. Updating from 0.5.1 or older: install Chef Shared Loader at the same time. Those versions had the loader built in; 0.6.0 and newer don't.
 5. Updating from Treasure Map: disable or remove Treasure Map first (it needs the old loaders, which no longer work on the current game).
