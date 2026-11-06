@@ -120,7 +120,7 @@ If you like my mods, you can support me on [Patreon](https://www.patreon.com/c/C
 ## Credits
 
 - The pickup icons, the enemy skull and dot, and the weapon silhouettes are the game's own icons.
-- Thanks to plataodomo, whose [Objective Tracker](https://ayakamods.com/mods/objective-tracker.4667/) showed how to tell when an enemy structure is destroyed in plain Lua: reading a bot fabricator's animation state, checking that a unit has an animation state machine before reading its state (a colony fabricator without one crashes the game), and watching a structure's meshes. Ideas only; no code was copied.
+- Thanks to plataodomo, whose [Objective Tracker](https://ayakamods.com/mods/objective-tracker.4667/) showed how to tell when an enemy structure is destroyed in plain Lua: Ideas only; no code was copied.
 - Fonts: Poppins, Anton and Barlow Condensed (SIL Open Font License).
 
 ## License
